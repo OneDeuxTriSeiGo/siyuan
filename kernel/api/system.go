@@ -37,27 +37,18 @@ func addMicrosoftDefenderExclusion(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
 
-	if !gulu.OS.IsWindows() {
-		return
-	}
-
-	err := model.AddMicrosoftDefenderExclusion()
-	if nil != err {
-		ret.Code = -1
-		ret.Msg = err.Error()
-	}
+	ret.Code = -1
+	ret.Msg = "Disabled API Call 'addMicrosoftDefenderExclusion' called"
+	logging.LogErrorf("%s: %s", ret.Msg, c.Request)
 }
 
 func ignoreAddMicrosoftDefenderExclusion(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
 
-	if !gulu.OS.IsWindows() {
-		return
-	}
-
-	model.Conf.System.MicrosoftDefenderExcluded = true
-	model.Conf.Save()
+	ret.Code = -1
+	ret.Msg = "Disabled API Call 'ignoreAddMicrosoftDefenderExclusion' called"
+	logging.LogErrorf("%s: %s", ret.Msg, c.Request)
 }
 
 func getWorkspaceInfo(c *gin.Context) {
@@ -293,7 +284,6 @@ func exportConf(c *gin.Context) {
 		clonedConf.System.Container = ""
 		clonedConf.System.IsMicrosoftStore = false
 		clonedConf.System.IsInsider = false
-		clonedConf.System.MicrosoftDefenderExcluded = false
 	}
 	clonedConf.Sync = nil
 	clonedConf.Stat = nil
