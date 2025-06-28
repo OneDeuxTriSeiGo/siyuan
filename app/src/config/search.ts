@@ -79,10 +79,6 @@ export const initConfigSearch = (element: HTMLElement, app: App) => {
             .concat(Object.keys(Constants.SIYUAN_KEYMAP.editor.list))
             .concat(Object.keys(Constants.SIYUAN_KEYMAP.editor.table))),
 
-        // 账号
-        getLang(["accountTip", "accountName", "password", "captcha", "forgetPassword", "login", "register",
-            "twoFactorCaptcha", "account1", "account2", "account5"]),
-
         // 云端
         getLang(["cloudStorage", "trafficStat", "sync", "backup", "cdn", "total", "sizeLimit", "cloudBackup",
             "cloudBackupTip", "updatePath", "cloudSync", "upload", "download", "syncMode", "syncModeTip",
