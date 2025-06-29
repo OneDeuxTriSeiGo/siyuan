@@ -64,6 +64,22 @@ func GetCloudForumAssetsServer() string {
 	return northAmericaForumAssetsServer
 }
 
+func GetGitHubApiEndpoint() string {
+	return GitHubApiEndpoint
+}
+
+func GetGitHubSiyuanRepo() string {
+	return GitHubSiyuanRepo
+}
+
+func GetGitHubBazaarRepo() string {
+	return GitHubBazaarRepo
+}
+
+func GetGitHubBazaarBranch() string {
+	return GitHubBazaarBranch
+}
+
 const (
 	chinaServer            = "https://chinaServer.invalid"             // 中国大陆云端服务地址，阿里云负载均衡，用于接口（数据同步文件上传、下载会走七牛云 OSS ChinaSyncServer）
 	chinaWebSocketServer   = "wss://chinaWebSocketServer.invalid"      // 中国大陆云端服务地址，阿里云负载均衡，用于接口（数据同步文件上传、下载会走七牛云 OSS ChinaSyncServer）
@@ -78,6 +94,11 @@ const (
 	northAmericaCloudAssetsServer = "https://northAmericaCloudAssetsServer.invalid/" // 北美云端图床服务地址，用于导出预览模式下订阅会员渲染图床
 	northAmericaAccountServer     = "https://northAmericaAccountServer.invalid"      // 流云服务地址，用于账号登录、分享发布帖子
 	northAmericaForumAssetsServer = "https://northAmericaForumAssetsServer.invalid/" // 北美云端图床服务地址，用于发布文章到社区
+
+	GitHubApiEndpoint = "https://api.github.com"
+	GitHubSiyuanRepo = "siyuan-note/siyuan"
+	GitHubBazaarRepo = "siyuan-note/bazaar"
+	GitHubBazaarBranch = "main"
 
 	BazaarStatServer = "https://bazaar.b3logfile.com" // 集市包统计服务地址，七牛云，全球 CDN
 	BazaarOSSServer  = "https://oss.b3logfile.com"    // 云端对象存储地址，七牛云，仅用于读取集市包，全球 CDN
