@@ -22,11 +22,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/88250/gulu"
-	"github.com/siyuan-note/eventbus"
 	"github.com/siyuan-note/logging"
 )
 
@@ -105,84 +103,7 @@ var (
 )
 
 func InitPandoc() {
-	if ContainerStd != Container {
-		return
-	}
-
-	pandocDir := filepath.Join(TempDir, "pandoc")
-
-	if confPath := filepath.Join(ConfDir, "conf.json"); gulu.File.IsExist(confPath) {
-		// Workspace built-in Pandoc is no longer initialized after customizing Pandoc path https://github.com/siyuan-note/siyuan/issues/8377
-		if data, err := os.ReadFile(confPath); err == nil {
-			conf := map[string]interface{}{}
-			if err = gulu.JSON.UnmarshalJSON(data, &conf); err == nil && nil != conf["export"] {
-				export := conf["export"].(map[string]interface{})
-				if customPandocBinPath := export["pandocBin"].(string); !strings.HasPrefix(customPandocBinPath, pandocDir) {
-					if pandocVer := getPandocVer(customPandocBinPath); "" != pandocVer {
-						PandocBinPath = customPandocBinPath
-						logging.LogInfof("custom pandoc [ver=%s, bin=%s]", pandocVer, PandocBinPath)
-						return
-					}
-				}
-			}
-		}
-	}
-
-	defer eventbus.Publish(EvtConfPandocInitialized)
-
-	if gulu.OS.IsWindows() {
-		if "amd64" == runtime.GOARCH {
-			PandocBinPath = filepath.Join(pandocDir, "bin", "pandoc.exe")
-		}
-	} else if gulu.OS.IsDarwin() {
-		PandocBinPath = filepath.Join(pandocDir, "bin", "pandoc")
-	} else if gulu.OS.IsLinux() {
-		if "amd64" == runtime.GOARCH {
-			PandocBinPath = filepath.Join(pandocDir, "bin", "pandoc")
-		}
-	}
 	pandocVer := getPandocVer(PandocBinPath)
-	if "" != pandocVer {
-		logging.LogInfof("built-in pandoc [ver=%s, bin=%s]", pandocVer, PandocBinPath)
-		return
-	}
-
-	pandocZip := filepath.Join(WorkingDir, "pandoc.zip")
-	if "dev" == Mode || !gulu.File.IsExist(pandocZip) {
-		if gulu.OS.IsWindows() {
-			if "amd64" == runtime.GOARCH {
-				pandocZip = filepath.Join(WorkingDir, "pandoc/pandoc-windows-amd64.zip")
-			}
-		} else if gulu.OS.IsDarwin() {
-			if "amd64" == runtime.GOARCH {
-				pandocZip = filepath.Join(WorkingDir, "pandoc/pandoc-darwin-amd64.zip")
-			} else if "arm64" == runtime.GOARCH {
-				pandocZip = filepath.Join(WorkingDir, "pandoc/pandoc-darwin-arm64.zip")
-			}
-		} else if gulu.OS.IsLinux() {
-			if "amd64" == runtime.GOARCH {
-				pandocZip = filepath.Join(WorkingDir, "pandoc/pandoc-linux-amd64.zip")
-			} else if "arm64" == runtime.GOARCH {
-				pandocZip = filepath.Join(WorkingDir, "pandoc/pandoc-linux-arm64.zip")
-			}
-		}
-	}
-
-	if !gulu.File.IsExist(pandocZip) {
-		PandocBinPath = ""
-		logging.LogErrorf("pandoc zip [%s] not found", pandocZip)
-		return
-	}
-
-	if err := gulu.Zip.Unzip(pandocZip, pandocDir); err != nil {
-		logging.LogErrorf("unzip pandoc failed: %s", err)
-		return
-	}
-
-	if gulu.OS.IsDarwin() || gulu.OS.IsLinux() {
-		exec.Command("chmod", "+x", PandocBinPath).CombinedOutput()
-	}
-	pandocVer = getPandocVer(PandocBinPath)
 	logging.LogInfof("initialized built-in pandoc [ver=%s, bin=%s]", pandocVer, PandocBinPath)
 }
 
