@@ -55,7 +55,7 @@ in
       name = "${finalAttrs.pname}-${finalAttrs.version}-kernel";
       inherit (finalAttrs) src;
       sourceRoot = "${finalAttrs.src.name}/kernel";
-      vendorHash = "sha256-GRKBZe9cd2/sYstiCD/f/ckF0G1GYBPBc8FSFmjw3Mo=";
+      vendorHash = "sha256-ZUSfehCqHUZyWHHisulg4x9v+YtnoktqaLDR7SjeGQo=";
 
       # this patch makes it so that file permissions are not kept when copying files using the gulu package
       # this fixes a problem where it was copying files from the store and keeping their permissions
@@ -95,7 +95,7 @@ in
         sourceRoot
         ;
       fetcherVersion = 1;
-      hash = "sha256-vBeOImzsZ/6FtA0DkHsAO3UI/V/MaNDQ6dGNZrdO43U=";
+      hash = "sha256-jKao033BT3voiVyYabHGxnJRoSietOwdvwc44B8sYns=";
     };
 
     sourceRoot = "${finalAttrs.src.name}/app";
