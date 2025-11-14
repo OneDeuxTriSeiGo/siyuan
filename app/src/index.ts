@@ -55,6 +55,7 @@ export class App {
             layout: {},
             dialogs: [],
             blockPanels: [],
+            closedTabs: [],
             ctrlIsPressed: false,
             altIsPressed: false,
             ws: new Model({

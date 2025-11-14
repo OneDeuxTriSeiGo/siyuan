@@ -341,7 +341,6 @@ export class Graph extends Model {
         });
         this.inputElement.addEventListener("compositionend", () => {
             this.searchGraph(false);
-            this.inputElement.classList.add("search__input--block");
         });
         this.inputElement.addEventListener("blur", (event: InputEvent) => {
             const inputElement = event.target as HTMLInputElement;
@@ -350,11 +349,6 @@ export class Graph extends Model {
         this.inputElement.addEventListener("input", (event: InputEvent) => {
             if (event.isComposing) {
                 return;
-            }
-            if (this.inputElement.value === "") {
-                this.inputElement.classList.remove("search__input--block");
-            } else {
-                this.inputElement.classList.add("search__input--block");
             }
             this.searchGraph(false);
         });
@@ -568,7 +562,7 @@ export class Graph extends Model {
                 item.color = {color: rootStyle.getPropertyValue("--b3-graph-line").trim()};
             }
         });
-        addScript(`${Constants.PROTYLE_CDN}/js/vis/vis-network.min.js?v=9.1.2`, "protyleVisScript").then(() => {
+        addScript(`${Constants.PROTYLE_CDN}/js/vis/vis-network.min.js?v=9.1.13`, "protyleVisScript").then(() => {
             this.network?.destroy();
             if (!this.graphData || !this.graphData.nodes || this.graphData.nodes.length === 0) {
                 return;

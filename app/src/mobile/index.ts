@@ -10,7 +10,7 @@ import {addBaseURL, getIdFromSYProtocol, isSYProtocol, setNoteBook} from "../uti
 import {handleTouchEnd, handleTouchMove, handleTouchStart} from "./util/touch";
 import {fetchGet, fetchPost} from "../util/fetch";
 import {initFramework} from "./util/initFramework";
-import {addGA, initAssets, loadAssets} from "../util/assets";
+import {initAssets, loadAssets} from "../util/assets";
 import {bootSync} from "../dialog/processSystem";
 import {initMessage, showMessage} from "../dialog/message";
 import {goBack} from "./util/MobileBackFoward";
@@ -121,7 +121,6 @@ class App {
                             });
                         });
                     });
-                    addGA();
                 });
             });
             document.addEventListener("touchstart", handleTouchStart, false);
@@ -165,7 +164,7 @@ window.reconnectWebSocket = () => {
     window.siyuan.ws.send("ping", {});
     window.siyuan.mobile.docks.file.send("ping", {});
     window.siyuan.mobile.editor.protyle.ws.send("ping", {});
-    window.siyuan.mobile.popEditor.protyle.ws.send("ping", {});
+    window.siyuan.mobile.popEditor?.protyle.ws.send("ping", {});
 };
 window.goBack = goBack;
 window.showMessage = showMessage;

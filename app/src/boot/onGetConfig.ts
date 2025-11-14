@@ -7,11 +7,12 @@ import * as fs from "fs";
 import * as path from "path";
 import {afterExport} from "../protyle/export/util";
 import {onWindowsMsg} from "../window/onWindowsMsg";
+import {initFocusFix} from "../protyle/util/compatibility";
 /// #endif
 import {Constants} from "../constants";
 import {appearance} from "../config/appearance";
 import {fetchPost, fetchSyncPost} from "../util/fetch";
-import {addGA, initAssets, setInlineStyle} from "../util/assets";
+import {initAssets, setInlineStyle} from "../util/assets";
 import {renderSnippet} from "../config/util/snippets";
 import {openFile, openFileById} from "../editor/util";
 import {exitSiYuan} from "../dialog/processSystem";
@@ -68,7 +69,10 @@ export const onGetConfig = (isStart: boolean, app: App) => {
     initBar(app);
     initStatus();
     initWindow(app);
-    appearance.onSetappearance(window.siyuan.config.appearance);
+    /// #if !BROWSER
+    initFocusFix();
+    /// #endif
+    appearance.onSetAppearance(window.siyuan.config.appearance);
     initAssets();
     setInlineStyle();
     renderSnippet();
@@ -87,7 +91,6 @@ export const onGetConfig = (isStart: boolean, app: App) => {
             firstResize = true;
         }, 200);
     });
-    addGA();
 };
 
 const winOnMaxRestore = async () => {

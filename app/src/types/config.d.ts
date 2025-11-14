@@ -63,7 +63,7 @@ declare namespace Config {
          */
         openHelp: boolean;
         /**
-         * Publishing service
+         * Publish service
          * 发布服务
          */
         publish: IPublish;
@@ -255,17 +255,18 @@ declare namespace Config {
      */
     export type TLang =
         "en_US"
+        | "ar_SA"
+        | "de_DE"
         | "es_ES"
         | "fr_FR"
-        | "zh_CHT"
-        | "zh_CN"
-        | "ja_JP"
-        | "it_IT"
-        | "de_DE"
         | "he_IL"
-        | "ru_RU"
+        | "it_IT"
+        | "ja_JP"
         | "pl_PL"
-        | "ar_SA";
+        | "pt_BR"
+        | "ru_RU"
+        | "zh_CN"
+        | "zh_CHT";
 
     /**
      * SiYuan bazaar related configuration
@@ -383,6 +384,13 @@ declare namespace Config {
          * Whether the embedded block displays breadcrumbs
          */
         embedBlockBreadcrumb: boolean;
+        /**
+         * Heading embed mode for embedded blocks
+         * - `0`: Show title with blocks below (default)
+         * - `1`: Show only title
+         * - `2`: Show only blocks below title
+         */
+        headingEmbedMode: number;
         /**
          * Common emoji icons
          */
@@ -627,6 +635,10 @@ declare namespace Config {
          * Whether to save the content of the .sy file as a single-line JSON object
          */
         useSingleLineSave: boolean;
+        /**
+         * The .sy and database .json files larger than this value will prompt a warning (unit: MB)
+         */
+        largeFileWarningSize: number;
     }
 
     /**
@@ -973,29 +985,35 @@ declare namespace Config {
      * SiYuan general shortcut keys
      */
     export interface IKeymapGeneral extends IKeys {
-        addToDatabase: IKey;
-        backlinks: IKey;
-        bookmark: IKey;
-        closeAll: IKey;
-        closeLeft: IKey;
-        closeOthers: IKey;
-        closeRight: IKey;
-        closeTab: IKey;
-        closeUnmodified: IKey;
+        mainMenu: IKey;
         commandPanel: IKey;
-        config: IKey;
-        dailyNote: IKey;
-        dataHistory: IKey;
         editReadonly: IKey;
-        enter: IKey;
+        syncNow: IKey;
         enterBack: IKey;
-        fileTree: IKey;
-        globalGraph: IKey;
-        globalSearch: IKey;
-        goBack: IKey;
+        enter: IKey;
         goForward: IKey;
-        goToEditTabNext: IKey;
-        goToEditTabPrev: IKey;
+        goBack: IKey;
+        newFile: IKey;
+        search: IKey;
+        globalSearch: IKey;
+        stickSearch: IKey;
+        replace: IKey;
+        closeTab: IKey;
+        fileTree: IKey;
+        outline: IKey;
+        bookmark: IKey;
+        tag: IKey;
+        dailyNote: IKey;
+        inbox: IKey;
+        backlinks: IKey;
+        graphView: IKey;
+        globalGraph: IKey;
+        riffCard: IKey;
+        config: IKey;
+        dataHistory: IKey;
+        toggleWin: IKey;
+        lockScreen: IKey;
+        recentDocs: IKey;
         goToTab1: IKey;
         goToTab2: IKey;
         goToTab3: IKey;
@@ -1007,28 +1025,25 @@ declare namespace Config {
         goToTab9: IKey;
         goToTabNext: IKey;
         goToTabPrev: IKey;
-        graphView: IKey;
-        inbox: IKey;
-        lockScreen: IKey;
-        mainMenu: IKey;
+        goToEditTabNext: IKey;
+        goToEditTabPrev: IKey;
+        recentClosed: IKey;
         move: IKey;
-        newFile: IKey;
-        outline: IKey;
-        recentDocs: IKey;
-        replace: IKey;
-        riffCard: IKey;
-        search: IKey;
         selectOpen1: IKey;
+        toggleDock: IKey;
         splitLR: IKey;
-        splitMoveB: IKey;
         splitMoveR: IKey;
         splitTB: IKey;
-        stickSearch: IKey;
-        syncNow: IKey;
+        splitMoveB: IKey;
+        closeOthers: IKey;
+        closeAll: IKey;
+        closeUnmodified: IKey;
+        closeLeft: IKey;
+        closeRight: IKey;
         tabToWindow: IKey;
-        tag: IKey;
-        toggleDock: IKey;
-        toggleWin: IKey;
+        addToDatabase: IKey;
+        unsplit: IKey;
+        unsplitAll: IKey;
     }
 
     /**
@@ -1058,29 +1073,29 @@ declare namespace Config {
     export type TLogLevel = "off" | "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
     /**
-     * Publishing service
+     * Publish service
      */
     export interface IPublish {
         /**
-         * Whether to open the publishing service
+         * Whether to open the publish service
          */
         enable: boolean;
         /**
-         * The basic authentication settings of publishing service
+         * The basic authentication settings of publish service
          */
         auth: IPublishAuth;
         /**
-         * Port on which the publishing service listens
+         * Port on which the publish service listens
          */
         port: number;
     }
 
     /**
-     * Publishing service authentication settings
+     * Publish service authentication settings
      */
     export interface IPublishAuth {
         /**
-         * Whether to enable basic authentication for publishing services
+         * Whether to enable basic authentication for publish services
          */
         enable: boolean;
         /**
@@ -1499,10 +1514,6 @@ declare namespace Config {
          * The absolute path of the `data` directory of the current workspace
          */
         dataDir: string;
-        /**
-         * Whether to disable Google Analytics
-         */
-        disableGoogleAnalytics: boolean;
         /**
          * Whether to automatically download the installation package for the new version
          */
@@ -2046,6 +2057,10 @@ declare namespace Config {
      * SiYuan search tab configuration
      */
     export interface IUILayoutTabSearchConfig {
+        /**
+         * 搜索传入的查询内容
+         */
+        query?: string;
         /**
          * Grouping strategy
          * - `0`: No grouping
