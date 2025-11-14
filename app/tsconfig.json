@@ -12,7 +12,7 @@
       "node"
     ],
     "declaration": true,
-    "emitDeclarationOnly": true,
+    "emitDeclarationOnly": true
   },
   "include": [
     "src"

@@ -62,7 +62,6 @@ type AppConf struct {
 	UILayout       *conf.UILayout   `json:"uiLayout"`       // 界面布局。不要直接使用，使用 GetUILayout() 和 SetUILayout() 方法
 	UserData       string           `json:"userData"`       // 社区用户信息，对 User 加密存储
 	User           *conf.User       `json:"-"`              // 社区用户内存结构，不持久化。不要直接使用，使用 GetUser() 和 SetUser() 方法
-	Account        *conf.Account    `json:"account"`        // 帐号配置
 	ReadOnly       bool             `json:"readonly"`       // 是否是以只读模式运行
 	LocalIPs       []string         `json:"localIPs"`       // 本地 IP 列表
 	AccessAuthCode string           `json:"accessAuthCode"` // 访问授权码
@@ -332,9 +331,6 @@ func InitConf() {
 
 	if "" != Conf.UserData {
 		Conf.SetUser(loadUserFromConf())
-	}
-	if nil == Conf.Account {
-		Conf.Account = conf.NewAccount()
 	}
 
 	if nil == Conf.Sync {

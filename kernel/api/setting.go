@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/siyuan-note/siyuan/kernel/bazaar"
 	"github.com/siyuan-note/siyuan/kernel/conf"
+	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/model"
 	"github.com/siyuan-note/siyuan/kernel/server/proxy"
 	"github.com/siyuan-note/siyuan/kernel/sql"
@@ -248,32 +249,8 @@ func setFlashcard(c *gin.Context) {
 }
 
 func setAccount(c *gin.Context) {
-	ret := gulu.Ret.NewResult()
-	defer c.JSON(http.StatusOK, ret)
-
-	arg, ok := util.JsonArg(c, ret)
-	if !ok {
-		return
-	}
-
-	param, err := gulu.JSON.MarshalJSON(arg)
-	if err != nil {
-		ret.Code = -1
-		ret.Msg = err.Error()
-		return
-	}
-
-	account := &conf.Account{}
-	if err = gulu.JSON.UnmarshalJSON(param, account); err != nil {
-		ret.Code = -1
-		ret.Msg = err.Error()
-		return
-	}
-
-	model.Conf.Account = account
-	model.Conf.Save()
-
-	ret.Data = model.Conf.Account
+	logging.LogErrorf("Disabled API Call 'setAccount' called: %s", c.Request)
+	return
 }
 
 func setEditor(c *gin.Context) {
