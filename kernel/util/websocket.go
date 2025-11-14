@@ -32,6 +32,29 @@ var (
 	sessions = sync.Map{} // {appId, {sessionId, session}}
 )
 
+func BroadcastByTypeAndExcludeApp(excludeApp, typ, cmd string, code int, msg string, data interface{}) {
+	sessions.Range(func(key, value interface{}) bool {
+		appSessions := value.(*sync.Map)
+		if key == excludeApp {
+			return true
+		}
+
+		appSessions.Range(func(key, value interface{}) bool {
+			session := value.(*melody.Session)
+			if t, ok := session.Get("type"); ok && typ == t {
+				event := NewResult()
+				event.Cmd = cmd
+				event.Code = code
+				event.Msg = msg
+				event.Data = data
+				session.Write(event.Bytes())
+			}
+			return true
+		})
+		return true
+	})
+}
+
 func BroadcastByTypeAndApp(typ, app, cmd string, code int, msg string, data interface{}) {
 	appSessions, ok := sessions.Load(app)
 	if !ok {
@@ -160,6 +183,16 @@ func PushUpdateMsg(msgId string, msg string, timeout int) {
 func PushMsg(msg string, timeout int) (msgId string) {
 	msgId = gulu.Rand.String(7)
 	BroadcastByType("main", "msg", 0, msg, map[string]interface{}{"id": msgId, "closeTimeout": timeout})
+	return
+}
+
+func PushMsgWithApp(app, msg string, timeout int) (msgId string) {
+	msgId = gulu.Rand.String(7)
+	if "" == app {
+		BroadcastByType("main", "msg", 0, msg, map[string]interface{}{"id": msgId, "closeTimeout": timeout})
+		return
+	}
+	BroadcastByTypeAndApp("main", app, "msg", 0, msg, map[string]interface{}{"id": msgId, "closeTimeout": timeout})
 	return
 }
 
