@@ -39,3 +39,7 @@ yarn.lock
 
 # Workflows
 **/__pycache__
+
+# Nix
+result
+result/
