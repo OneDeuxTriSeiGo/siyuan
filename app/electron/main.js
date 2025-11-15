@@ -81,10 +81,10 @@ const windowNavigate = (currentWindow) => {
 
 const setProxy = (proxyURL, webContents) => {
     if (proxyURL.startsWith("://")) {
-        console.log("network proxy [system]");
+        console.log("INFO: network proxy [system]");
         return webContents.session.setProxy({mode: "system"});
     }
-    console.log("network proxy [" + proxyURL + "]");
+    console.log("INFO: network proxy [" + proxyURL + "]");
     return webContents.session.setProxy({proxyRules: proxyURL});
 };
 
@@ -174,7 +174,7 @@ const exitApp = (port, errorWindowId) => {
             app.exit();
         }
         globalShortcut.unregisterAll();
-        writeLog("exited ui");
+        writeLog("INFO: exited ui");
     }
 };
 
@@ -271,7 +271,7 @@ const initMainWindow = () => {
         height: defaultHeight,
     }, oldWindowState);
 
-    writeLog("window stat [x=" + windowState.x + ", y=" + windowState.y + ", width=" + windowState.width + ", height=" + windowState.height + "], " +
+    writeLog("INFO: window state [x=" + windowState.x + ", y=" + windowState.y + ", width=" + windowState.width + ", height=" + windowState.height + "], " +
         "default [x=0, y=0, width=" + defaultWidth + ", height=" + defaultHeight + "], " +
         "old [x=" + oldWindowState.x + ", y=" + oldWindowState.y + ", width=" + oldWindowState.width + ", height=" + oldWindowState.height + "], " +
         "workArea [width=" + workArea.width + ", height=" + workArea.height + "]");
@@ -341,7 +341,7 @@ const initMainWindow = () => {
     if (resetToCenter) {
         currentWindow.center();
     } else {
-        writeLog("window position [x=" + x + ", y=" + y + "]");
+        writeLog("INFO: window position [x=" + x + ", y=" + y + "]");
         currentWindow.setPosition(x, y);
     }
     currentWindow.webContents.userAgent = "SiYuan/" + appVer + " https://b3log.org/siyuan Electron " + currentWindow.webContents.userAgent;
@@ -518,7 +518,7 @@ const initKernel = (workspace, port, lang) => {
                 await getAvailablePort();
             }
         }
-        writeLog("got kernel port [" + kernelPort + "]");
+        writeLog("INFO: got kernel port [" + kernelPort + "]");
         if (!kernelPort) {
             bootWindow.destroy();
             resolve(false);
@@ -537,7 +537,7 @@ const initKernel = (workspace, port, lang) => {
         if (lang && "" !== lang) {
             cmds.push("--lang", lang);
         }
-        let cmd = `ui version [${appVer}], booting kernel [${kernelPath} ${cmds.join(" ")}]`;
+        let cmd = `INFO: ui version [${appVer}], booting kernel [${kernelPath} ${cmds.join(" ")}]`;
         writeLog(cmd);
         if (!isDevEnv || workspaces.length > 0) {
             const cp = require("child_process");
@@ -547,7 +547,7 @@ const initKernel = (workspace, port, lang) => {
             },);
 
             const currentKernelPort = kernelPort;
-            writeLog("booted kernel process [pid=" + kernelProcess.pid + ", port=" + kernelPort + "]");
+            writeLog("INFO: booted kernel process [pid=" + kernelProcess.pid + ", port=" + kernelPort + "]");
             kernelProcess.on("close", (code) => {
                 writeLog(`kernel [pid=${kernelProcess.pid}, port=${currentKernelPort}] exited with code [${code}]`);
                 if (0 !== code) {
@@ -588,7 +588,7 @@ const initKernel = (workspace, port, lang) => {
 
         let apiData;
         let count = 0;
-        writeLog("checking kernel version");
+        writeLog("INFO: starting kernel version check");
         for (; ;) {
             try {
                 const apiResult = await net.fetch(getServer() + "/api/system/version");
@@ -596,9 +596,9 @@ const initKernel = (workspace, port, lang) => {
                 bootWindow.loadURL(getServer() + "/appearance/boot/index.html");
                 break;
             } catch (e) {
-                writeLog("get kernel version failed: " + e.message);
+                writeLog("INFO: waiting for kernel to start...");
                 if (14 < ++count) {
-                    writeLog("get kernel ver failed");
+                    writeLog("get kernel version failed: " + e.message);
                     showErrorWindow("⚠️ 获取内核服务端口失败 Failed to get kernel serve port", "<div>获取内核服务端口失败，请确保程序拥有网络权限并不受防火墙和杀毒软件阻止。</div><div>Failed to get kernel serve port, please make sure the program has network permissions and is not blocked by firewalls and antivirus software.</div>");
                     bootWindow.destroy();
                     resolve(false);
@@ -609,7 +609,7 @@ const initKernel = (workspace, port, lang) => {
         }
 
         if (0 === apiData.code) {
-            writeLog("got kernel version [" + apiData.data + "]");
+            writeLog("INFO: got kernel version [" + apiData.data + "]");
             if (!isDevEnv && apiData.data !== appVer) {
                 writeLog(`kernel [${apiData.data}] is running, shutdown it now and then start kernel [${appVer}]`);
                 net.fetch(getServer() + "/api/system/exit", {method: "POST"});
@@ -652,7 +652,7 @@ app.commandLine.appendSwitch("enable-features", "PlatformHEVCDecoderSupport");
 app.commandLine.appendSwitch("xdg-portal-required-version", "4");
 
 // Support set Chromium command line arguments on the desktop https://github.com/siyuan-note/siyuan/issues/9696
-writeLog("app is packaged [" + app.isPackaged + "], command line args [" + process.argv.join(", ") + "]");
+writeLog("INFO: app is packaged [" + app.isPackaged + "], command line args [" + process.argv.join(", ") + "]");
 let argStart = 1;
 if (!app.isPackaged) {
     argStart = 2;
@@ -670,7 +670,7 @@ for (let i = argStart; i < process.argv.length; i++) {
     }
 
     app.commandLine.appendSwitch(arg);
-    writeLog("command line switch [" + arg + "]");
+    writeLog("INFO: command line switch [" + arg + "]");
 }
 
 app.whenReady().then(() => {
