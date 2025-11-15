@@ -9,10 +9,11 @@
   nodejs,
   pnpm_10,
   electron,
-  makeWrapper,
+  makeBinaryWrapper,
   makeDesktopItem,
   copyDesktopItems,
   nix-update-script,
+  xdg-utils,
 }: let
   pnpm = pnpm_10;
 
@@ -82,7 +83,7 @@ in
     nativeBuildInputs = [
       nodejs
       pnpm.configHook
-      makeWrapper
+      makeBinaryWrapper
       copyDesktopItems
     ];
 
@@ -128,7 +129,7 @@ in
       mkdir -p $out/share/siyuan
       cp -r build/*-unpacked/{locales,resources{,.pak}} $out/share/siyuan
 
-      makeWrapper ${lib.getExe electron} $out/bin/siyuan \
+      makeBinaryWrapper ${lib.getExe electron} $out/bin/siyuan \
           --chdir $out/share/siyuan/resources \
           --add-flags $out/share/siyuan/resources/app \
           --set ELECTRON_FORCE_IS_PACKAGED 1 \
