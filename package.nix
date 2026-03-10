@@ -8,6 +8,8 @@
   pandoc,
   nodejs,
   pnpm_10,
+  fetchPnpmDeps,
+  pnpmConfigHook,
   electron,
   makeBinaryWrapper,
   makeDesktopItem,
@@ -82,12 +84,13 @@ in
 
     nativeBuildInputs = [
       nodejs
-      pnpm.configHook
+      pnpmConfigHook
+      pnpm
       makeBinaryWrapper
       copyDesktopItems
     ];
 
-    pnpmDeps = pnpm.fetchDeps {
+    pnpmDeps = fetchPnpmDeps {
       inherit
         (finalAttrs)
         pname
@@ -95,7 +98,7 @@ in
         src
         sourceRoot
         ;
-      fetcherVersion = 1;
+      fetcherVersion = 3;
       hash = "sha256-jKao033BT3voiVyYabHGxnJRoSietOwdvwc44B8sYns=";
     };
 
