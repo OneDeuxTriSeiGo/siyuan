@@ -80,6 +80,7 @@ func setConfSnippet(c *gin.Context) {
 	model.Conf.Save()
 
 	ret.Data = snippet
+	model.PushReloadSnippet(snippet)
 }
 
 func addVirtualBlockRefExclude(c *gin.Context) {
@@ -293,6 +294,13 @@ func setEditor(c *gin.Context) {
 		editor.HistoryRetentionDays = 3650
 	}
 
+	if nil == editor.FloatWindowDelay {
+		v := 620
+		editor.FloatWindowDelay = &v
+	} else {
+		*editor.FloatWindowDelay = max(0, min(2000, *editor.FloatWindowDelay))
+	}
+
 	oldVirtualBlockRef := model.Conf.Editor.VirtualBlockRef
 	oldVirtualBlockRefInclude := model.Conf.Editor.VirtualBlockRefInclude
 	oldVirtualBlockRefExclude := model.Conf.Editor.VirtualBlockRefExclude
@@ -302,6 +310,7 @@ func setEditor(c *gin.Context) {
 	model.Conf.Save()
 
 	if oldGenerateHistoryInterval != model.Conf.Editor.GenerateHistoryInterval {
+		model.GenerateFileHistory()
 		model.ChangeHistoryTick(editor.GenerateHistoryInterval)
 	}
 
@@ -398,6 +407,14 @@ func setFiletree(c *gin.Context) {
 	if 32 < fileTree.MaxOpenTabCount {
 		fileTree.MaxOpenTabCount = 32
 	}
+
+	if conf.MinFileTreeRecentDocsListCount > fileTree.RecentDocsMaxListCount {
+		fileTree.RecentDocsMaxListCount = conf.MinFileTreeRecentDocsListCount
+	}
+	if conf.MaxFileTreeRecentDocsListCount < fileTree.RecentDocsMaxListCount {
+		fileTree.RecentDocsMaxListCount = conf.MaxFileTreeRecentDocsListCount
+	}
+
 	model.Conf.FileTree = fileTree
 	model.Conf.Save()
 
@@ -512,6 +529,7 @@ func setAppearance(c *gin.Context) {
 	}
 
 	model.Conf.Appearance = appearance
+	util.StatusBarCfg = model.Conf.Appearance.StatusBar
 	model.Conf.Lang = appearance.Lang
 	oldLang := util.Lang
 	util.Lang = model.Conf.Lang
@@ -524,6 +542,7 @@ func setAppearance(c *gin.Context) {
 	}
 
 	ret.Data = model.Conf.Appearance
+	util.BroadcastByType("main", "setAppearance", 0, "", model.Conf.Appearance)
 }
 
 func setPublish(c *gin.Context) {

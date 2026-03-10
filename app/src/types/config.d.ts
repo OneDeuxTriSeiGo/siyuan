@@ -51,9 +51,9 @@ declare namespace Config {
          */
         langs: ILang[];
         /**
-         * A list of the IP addresses of the devices on which the kernel resides
+         * A list of the kernel server addresses
          */
-        localIPs: string[];
+        serverAddrs: string[];
         /**
          * Log level
          */
@@ -245,6 +245,14 @@ declare namespace Config {
          * The version number of the theme currently in use
          */
         themeVer: string;
+        statusBar: IAppearanceStatusBar;
+    }
+
+    export interface IAppearanceStatusBar {
+        msgTaskDatabaseIndexCommitDisabled: boolean;
+        msgTaskHistoryDatabaseIndexCommitDisabled: boolean;
+        msgTaskAssetDatabaseIndexCommitDisabled: boolean;
+        msgTaskHistoryGenerateFileDisabled: boolean;
     }
 
     /**
@@ -262,9 +270,12 @@ declare namespace Config {
         | "he_IL"
         | "it_IT"
         | "ja_JP"
+        | "ko_KR"
         | "pl_PL"
         | "pt_BR"
         | "ru_RU"
+        | "sk_SK"
+        | "tr_TR"
         | "zh_CN"
         | "zh_CHT";
 
@@ -326,6 +337,11 @@ declare namespace Config {
     export interface IEditor {
 
         /**
+         * Whether to allow to execute javascript in the SVG
+         */
+        allowSVGScript: boolean;
+
+        /**
          * Whether to allow to execute javascript in the HTML block
          */
         allowHTMLBLockScript: boolean;
@@ -347,6 +363,14 @@ declare namespace Config {
          * Whether the backlink contains children
          */
         backlinkContainChildren: boolean;
+        /**
+         * Backlink sort mode
+         */
+        backlinkSort: number;
+        /**
+         * Backmention sort mode
+         */
+        backmentionSort: number;
         /**
          * The maximum length of the dynamic anchor text for block references
          */
@@ -402,6 +426,11 @@ declare namespace Config {
          * - `2`: Do not trigger the floating window
          */
         floatWindowMode: number;
+        /**
+         * Hover delay of the floating window in milliseconds.
+         * Only takes effect when `floatWindowMode` is `0`.
+         */
+        floatWindowDelay: number;
         /**
          * The font used in the editor
          */
@@ -464,6 +493,10 @@ declare namespace Config {
          */
         spellcheck: boolean;
         /**
+         * Support spell check languages
+         */
+        spellcheckLanguages: string[];
+        /**
          * Whether to enable virtual references
          */
         virtualBlockRef: boolean;
@@ -511,10 +544,6 @@ declare namespace Config {
          */
         blockRefTextRight: string;
         /**
-         * The path of the template file used when exporting to Docx
-         */
-        docxTemplate: string;
-        /**
          * File annotation reference export mode
          * - `0`: File name - page number - anchor text
          * - `1`: Anchor text only
@@ -533,13 +562,29 @@ declare namespace Config {
          */
         markdownYFM: boolean;
         /**
+         * Whether to remove the asset ID when exporting to Markdown
+         */
+        removeAssetsID: boolean;
+        /**
          * Whether to export the inline memo
          */
         inlineMemo: boolean;
         /**
+         * Whether to include sub-documents when exporting
+         */
+        includeSubDocs: boolean;
+        /**
+         * Whether to include related documents when exporting
+         */
+        includeRelatedDocs: boolean;
+        /**
          * Pandoc executable file path
          */
         pandocBin: string;
+        /**
+         * Pandoc parameters
+         */
+        pandocParams: string;
         /**
          * Whether the beginning of the paragraph is empty two spaces.
          * Insert two full-width spaces `U+3000` at the beginning of the paragraph.
@@ -575,6 +620,10 @@ declare namespace Config {
          * Whether to allow the creation of sub-documents deeper than 7 levels
          */
         allowCreateDeeper: boolean;
+        /**
+         * Don't automatically split the screen when opening search, PDF and other tabs
+         */
+        noSplitScreenWhenOpenTab: boolean;
         /**
          * Whether to automatically locate the currently open document in the document tree
          */
@@ -639,6 +688,14 @@ declare namespace Config {
          * The .sy and database .json files larger than this value will prompt a warning (unit: MB)
          */
         largeFileWarningSize: number;
+        /**
+         * Whether to create new documents at the top of the document tree
+         */
+        createDocAtTop: boolean;
+        /**
+         * The maximum number of recent documents listed
+         */
+        recentDocsMaxListCount: number;
     }
 
     /**
@@ -768,6 +825,10 @@ declare namespace Config {
          * Display quote block
          */
         blockquote: boolean;
+        /**
+         * Display callout
+         */
+        callout: boolean;
         /**
          * Display code block
          */
@@ -1182,6 +1243,10 @@ declare namespace Config {
          */
         blockquote: boolean;
         /**
+         * Whether to search callout
+         */
+        callout: boolean;
+        /**
          * Whether to distinguish between uppercase and lowercase letters when searching
          */
         caseSensitive: boolean;
@@ -1553,6 +1618,10 @@ declare namespace Config {
          * Whether to enable network serve (whether to allow connections from other devices)
          */
         networkServe: boolean;
+        /**
+         * Whether to enable HTTPS for network serve (TLS encryption)
+         */
+        networkServeTLS: boolean;
         /**
          * The operating system name determined at compile time (obtained using the command `go tool
          * dist list`)
@@ -2267,6 +2336,11 @@ declare namespace Config {
          * @default false
          */
         blockquote: boolean;
+        /**
+         * Search results contain callout blocks
+         * @default false
+         */
+        callout: boolean;
         /**
          * Search results contain code blocks
          * @default false

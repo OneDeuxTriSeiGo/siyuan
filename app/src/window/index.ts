@@ -6,7 +6,7 @@ import {initBlockPopover} from "../block/popover";
 import {addScript, addScriptSync} from "../protyle/util/addScript";
 import {genUUID} from "../util/genID";
 import {fetchGet, fetchPost} from "../util/fetch";
-import {addBaseURL, setNoteBook} from "../util/pathName";
+import {addBaseURL, redirectToCheckAuth, setNoteBook} from "../util/pathName";
 import {openFileById} from "../editor/util";
 import {
     processSync,
@@ -22,11 +22,13 @@ import {
 import {initMessage} from "../dialog/message";
 import {getAllTabs} from "../layout/getAll";
 import {getLocalStorage} from "../protyle/util/compatibility";
-import {init} from "../window/init";
+import {init} from "./init";
 import {loadPlugins, reloadPlugin} from "../plugin/loader";
 import {hideAllElements} from "../protyle/ui/hideElements";
 import {reloadEmoji} from "../emoji";
 import {updateControlAlt} from "../protyle/util/hotKey";
+import {updateAppearance} from "../config/util/updateAppearance";
+import {renderSnippet} from "../config/util/snippets";
 
 class App {
     public plugins: import("../plugin").Plugin[] = [];
@@ -56,6 +58,16 @@ class App {
                     });
                     if (data) {
                         switch (data.cmd) {
+                            case "logoutAuth":
+                                redirectToCheckAuth();
+                                break;
+                            case "setAppearance":
+                                updateAppearance(data.data);
+                                break;
+                            case "setSnippet":
+                                window.siyuan.config.snippet = data.data;
+                                renderSnippet();
+                                break;
                             case "setDefRefCount":
                                 setDefRefCount(data.data);
                                 break;

@@ -2,18 +2,12 @@ import {hasClosestBlock, hasClosestByClassName} from "../../util/hasClosest";
 import {focusBlock} from "../../util/selection";
 import {Menu} from "../../../plugin/Menu";
 import {transaction} from "../../wysiwyg/transaction";
-import {
-    genCellValue,
-    genCellValueByElement,
-    getTypeByCellElement,
-    renderCell,
-    renderCellAttr
-} from "./cell";
+import {genCellValue, genCellValueByElement, getTypeByCellElement, renderCell, renderCellAttr} from "./cell";
 import {fetchPost} from "../../../util/fetch";
 import * as dayjs from "dayjs";
 import {Constants} from "../../../constants";
 import {insertGalleryItemAnimation} from "./gallery/item";
-import {clearSelect} from "../../util/clearSelect";
+import {clearSelect} from "../../util/clear";
 import {isCustomAttr} from "./blockAttr";
 
 export const getFieldIdByCellElement = (cellElement: Element, viewType: TAVView): string => {
@@ -120,7 +114,7 @@ export const insertAttrViewBlockAnimation = (options: {
     previousId: string,
     groupID?: string
 }) => {
-    (options.blockElement.querySelector('[data-type="av-search"]') as HTMLInputElement).value = "";
+    options.blockElement.querySelector('[data-type="av-search"]').textContent = "";
     const groupQuery = options.groupID ? `.av__body[data-group-id="${options.groupID}"] ` : "";
     let previousElement = options.blockElement.querySelector(groupQuery + `.av__row[data-id="${options.previousId}"]`) || options.blockElement.querySelector(groupQuery + ".av__row--header");
     // 有排序需要加入最后一行
@@ -268,6 +262,20 @@ export const setPageSize = (options: {
         return;
     }
     const currentPageSize = options.target.dataset.size;
+    menu.addItem({
+        iconHTML: "",
+        label: "5",
+        checked: currentPageSize === "5",
+        click() {
+            updatePageSize({
+                currentPageSize,
+                newPageSize: "5",
+                protyle: options.protyle,
+                avID: options.avID,
+                nodeElement: options.nodeElement
+            });
+        }
+    });
     menu.addItem({
         iconHTML: "",
         label: "10",
@@ -436,7 +444,7 @@ export const insertRows = (options: {
         id: options.blockElement.dataset.nodeId,
         data: options.blockElement.getAttribute("updated")
     }]);
-    if (options.blockElement.getAttribute("data-av-type") === "gallery") {
+    if (["gallery", "kanban"].includes(options.blockElement.getAttribute("data-av-type"))) {
         insertGalleryItemAnimation({
             blockElement: options.blockElement,
             protyle: options.protyle,

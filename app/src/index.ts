@@ -6,7 +6,7 @@ import {initBlockPopover} from "./block/popover";
 import {addScript, addScriptSync} from "./protyle/util/addScript";
 import {genUUID} from "./util/genID";
 import {fetchGet, fetchPost} from "./util/fetch";
-import {addBaseURL, getIdFromSYProtocol, isSYProtocol, setNoteBook} from "./util/pathName";
+import {addBaseURL, getIdFromSYProtocol, isSYProtocol, redirectToCheckAuth, setNoteBook} from "./util/pathName";
 import {registerServiceWorker} from "./util/serviceWorker";
 import {openFileById} from "./editor/util";
 import {
@@ -22,10 +22,11 @@ import {
     setTitle,
     transactionError
 } from "./dialog/processSystem";
-import {initMessage} from "./dialog/message";
+import {initMessage, showMessage} from "./dialog/message";
 import {getAllTabs} from "./layout/getAll";
-import {getLocalStorage} from "./protyle/util/compatibility";
-import {getSearch} from "./util/functions";
+import {getLocalStorage, isChromeBrowser, isInMobileApp} from "./protyle/util/compatibility";
+import {getSearch, isBrowser} from "./util/functions";
+import {checkPublishServiceClosed} from "./util/processMessage";
 import {hideAllElements} from "./protyle/ui/hideElements";
 import {loadPlugins, reloadPlugin} from "./plugin/loader";
 import "./assets/scss/base.scss";
@@ -37,12 +38,17 @@ import {setLocalShorthandCount} from "./util/noRelyPCFunction";
 import {getDockByType} from "./layout/tabUtil";
 import {Tag} from "./layout/dock/Tag";
 import {updateControlAlt} from "./protyle/util/hotKey";
+import {updateAppearance} from "./config/util/updateAppearance";
+import {renderSnippet} from "./config/util/snippets";
 
 export class App {
     public plugins: import("./plugin").Plugin[] = [];
     public appId: string;
 
     constructor() {
+        if (checkPublishServiceClosed()) {
+            return;
+        }
         registerServiceWorker(`${Constants.SERVICE_WORKER_PATH}?v=${Constants.SIYUAN_VERSION}`);
         addBaseURL();
 
@@ -68,6 +74,16 @@ export class App {
                     });
                     if (data) {
                         switch (data.cmd) {
+                            case "logoutAuth":
+                                redirectToCheckAuth();
+                                break;
+                            case "setAppearance":
+                                updateAppearance(data.data);
+                                break;
+                            case "setSnippet":
+                                window.siyuan.config.snippet = data.data;
+                                renderSnippet();
+                                break;
                             case "setDefRefCount":
                                 setDefRefCount(data.data);
                                 break;
@@ -174,6 +190,10 @@ export class App {
                             case "openFileById":
                                 openFileById({app: this, id: data.data.id, action: [Constants.CB_GET_FOCUS]});
                                 break;
+                            case "exit":
+                                if (isBrowser()) {
+                                    window.location.href = "about:blank";
+                                }
                         }
                     }
                 }
@@ -197,6 +217,11 @@ export class App {
                         onGetConfig(response.data.start, this);
                         setTitle(window.siyuan.languages.siyuanNote);
                         initMessage();
+                        /// #if BROWSER && !MOBILE
+                        if (!isInMobileApp() && !window.siyuan.config.readonly && !window.siyuan.isPublish && !isChromeBrowser()) {
+                            showMessage(window.siyuan.languages.useChrome, 0, "error");
+                        }
+                        /// #endif
                     });
                 });
             });

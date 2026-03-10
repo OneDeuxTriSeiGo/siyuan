@@ -19,6 +19,7 @@ import {electronUndo} from "../../undo";
 import {getFieldIdByCellElement} from "./row";
 import {getFieldsByData} from "./view";
 import {getCompressURL, removeCompressURL} from "../../../util/image";
+import {callMobileAppShowKeyboard} from "../../../mobile/util/mobileAppUtil";
 
 const renderCellURL = (urlContent: string) => {
     let host = urlContent;
@@ -417,10 +418,18 @@ export const cellScrollIntoView = (blockElement: HTMLElement, cellElement: Eleme
     /// #if MOBILE
     const contentElement = hasClosestByClassName(blockElement, "protyle-content", true);
     if (contentElement && cellElement.getAttribute("data-dtype") !== "checkbox") {
-        const keyboardToolbarElement = document.getElementById("keyboardToolbar");
-        const keyboardH = parseInt(keyboardToolbarElement.getAttribute("data-keyboardheight")) || (window.outerHeight / 2 - 42);
-        if (cellRect.bottom > window.innerHeight - keyboardH - 42) {
-            contentElement.scrollTop += cellRect.bottom - window.innerHeight + 42 + keyboardH;
+        let keyboardToolbarTop = window.innerHeight / 2 - 48;
+        if (window.siyuan.mobile.size.isLandscape) {
+            if (window.siyuan.mobile.size.landscape.height1 !== window.siyuan.mobile.size.landscape.height2) {
+                keyboardToolbarTop = window.siyuan.mobile.size.landscape.height2 - 48;
+            }
+        } else {
+            if (window.siyuan.mobile.size.portrait.height1 !== window.siyuan.mobile.size.portrait.height2) {
+                keyboardToolbarTop = window.siyuan.mobile.size.portrait.height2 - 48;
+            }
+        }
+        if (cellRect.bottom > keyboardToolbarTop) {
+            contentElement.scrollTop = contentElement.scrollTop + (cellRect.bottom - keyboardToolbarTop);
         } else if (cellRect.top < 110) {
             contentElement.scrollTop -= 110 - cellRect.top;
         }
@@ -558,6 +567,7 @@ export const popTextCell = (protyle: IProtyle, cellElements: HTMLElement[], type
         }
         inputElement.select();
         inputElement.focus();
+        callMobileAppShowKeyboard();
         if (type === "template") {
             fetchPost("/api/av/renderAttributeView", {
                 id: blockElement.dataset.avId,
@@ -767,50 +777,42 @@ export const updateCellsValue = async (protyle: IProtyle, nodeElement: HTMLEleme
             if (Array.isArray(value)) {
                 newValue = oldValue.mAsset.concat(value);
             } else if (typeof value !== "undefined" && typeof value !== "object") { // 不传入为删除，传入字符串不进行处理
+                const htmlValue: IAVCellAssetValue[] = [];
                 let link = protyle.lute.GetLinkDest(value);
                 let name = "";
-                let imgSrc = "";
                 // https://github.com/siyuan-note/siyuan/issues/13892
                 if (!link && value.startsWith("assets/")) {
                     link = value;
                     name = getAssetName(value) + pathPosix().extname(value);
                 }
-                if (html) {
-                    const tempElement = document.createElement("template");
-                    tempElement.innerHTML = html;
-                    const aElement = tempElement.content.querySelector('[data-type~="a"]');
-                    if (aElement) {
-                        link = aElement.getAttribute("data-href");
-                        name = aElement.textContent;
-                    } else {
-                        const imgElement = tempElement.content.querySelector(".img img");
-                        if (imgElement) {
-                            imgSrc = imgElement.getAttribute("data-src");
-                        }
-                    }
-                }
                 // https://github.com/siyuan-note/siyuan/issues/12308
-                if (!link) {
-                    name = value;
-                }
-                if (!link && !name && !imgSrc) {
-                    break;
-                }
-                if (imgSrc) {
-                    // 支持解析 ![]() https://github.com/siyuan-note/siyuan/issues/11487
-                    newValue = oldValue.mAsset.concat({
-                        type: "image",
-                        content: imgSrc,
-                        name: ""
-                    });
-                } else {
-                    // 支持解析 https://github.com/siyuan-note/siyuan/issues/11463
-                    newValue = oldValue.mAsset.concat({
+                if (link) {
+                    htmlValue.push({
                         type: "file",
                         content: link,
                         name
                     });
                 }
+                if (html) {
+                    const tempElement = document.createElement("template");
+                    tempElement.innerHTML = html;
+                    tempElement.content.querySelectorAll('[data-type~="a"], .img img').forEach(item => {
+                        if (item.tagName === "IMG") {
+                            htmlValue.push({
+                                type: "image",
+                                content: item.getAttribute("data-src"),
+                                name: ""
+                            });
+                        } else {
+                            htmlValue.push({
+                                type: "file",
+                                content: item.getAttribute("data-href"),
+                                name: item.textContent
+                            });
+                        }
+                    });
+                }
+                newValue = oldValue.mAsset.concat(htmlValue);
             }
         } else if (type === "mSelect" || type === "select") {
             // 不传入为删除
@@ -875,31 +877,29 @@ export const updateCellsValue = async (protyle: IProtyle, nodeElement: HTMLEleme
             }
             cellValue.date.formattedContent = oldValue.date.formattedContent;
         }
-        if (objEquals(cellValue, oldValue)) {
-            break;
-        }
+        if (!objEquals(cellValue, oldValue)) {
+            doOperations.push({
+                action: "updateAttrViewCell",
+                id: cellId,
+                avID,
+                keyID: colId,
+                rowID,
+                data: cellValue
+            });
 
-        doOperations.push({
-            action: "updateAttrViewCell",
-            id: cellId,
-            avID,
-            keyID: colId,
-            rowID,
-            data: cellValue
-        });
-
-        undoOperations.push({
-            action: "updateAttrViewCell",
-            id: cellId,
-            avID,
-            keyID: colId,
-            rowID,
-            data: oldValue
-        });
-        if (isCustomAttr) {
-            item.innerHTML = genAVValueHTML(cellValue);
-        } else {
-            updateAttrViewCellAnimation(item, cellValue);
+            undoOperations.push({
+                action: "updateAttrViewCell",
+                id: cellId,
+                avID,
+                keyID: colId,
+                rowID,
+                data: oldValue
+            });
+            if (isCustomAttr) {
+                item.innerHTML = genAVValueHTML(cellValue);
+            } else {
+                updateAttrViewCellAnimation(item, cellValue);
+            }
         }
     }
     if (getOperations) {
@@ -980,7 +980,7 @@ export const renderCell = (cellValue: IAVCellValue, rowIndex = 0, showIcon = tru
         const dataValue = cellValue ? cellValue[cellValue.type as "date"] : null;
         text = `<span class="av__celltext" data-value='${JSON.stringify(dataValue)}'>`;
         if (dataValue && dataValue.isNotEmpty) {
-            text += dayjs(dataValue.content).format("YYYY-MM-DD HH:mm");
+            text += dataValue.formattedContent;
         }
         text += "</span>";
     } else if (["lineNumber"].includes(cellValue.type)) {
@@ -996,7 +996,7 @@ export const renderCell = (cellValue: IAVCellValue, rowIndex = 0, showIcon = tru
         });
     } else if (cellValue.type === "checkbox") {
         text += `<div class="fn__flex"><svg class="av__checkbox"><use xlink:href="#icon${cellValue?.checkbox?.checked ? "Check" : "Uncheck"}"></use></svg>`;
-        if (type === "gallery" && cellValue?.checkbox?.content) {
+        if (["gallery", "kanban"].includes(type) && cellValue?.checkbox?.content) {
             text += `<span class="fn__space"></span>${cellValue?.checkbox?.content}`;
         }
         text += "</div>";
@@ -1223,7 +1223,7 @@ export const cellValueIsEmpty = (value: IAVCellValue) => {
         return !value[value.type as "text"]?.content;
     }
     if (value.type === "number") {
-        return !value.number?.isNotEmpty;
+        return value.number ? !value.number.isNotEmpty : true;
     }
     if (["mSelect", "mAsset", "select"].includes(value.type)) {
         if (value[(value.type === "select" ? "mSelect" : value.type) as "mSelect"]?.length > 0) {

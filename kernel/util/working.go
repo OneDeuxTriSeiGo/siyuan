@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"mime"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -45,33 +46,27 @@ import (
 var Mode = "prod"
 
 const (
-	Ver       = "3.3.6"
+	Ver       = "3.5.9"
 	IsInsider = false
-
-	// env vars as fallback for commandline parameters
-	SIYUAN_ACCESS_AUTH_CODE = "SIYUAN_ACCESS_AUTH_CODE"
-	SIYUAN_WORKSPACE        = "SIYUAN_WORKSPACE_PATH"
-	SIYUAN_LANG             = "SIYUAN_LANG"
 )
 
 var (
-	RunInContainer                = false // 是否运行在容器中
-	SiyuanAccessAuthCodeBypass    = false // 是否跳过空访问授权码检查
-	SiyuanAccessAuthCodeViaEnvvar = ""    // Fallback auth code via env var (SIYUAN_ACCESS_AUTH_CODE)
+	RunInContainer             = false // 是否运行在容器中
+	SiYuanAccessAuthCodeBypass = false // 是否跳过空访问授权码检查
 )
 
 func initEnvVars() {
 	RunInContainer = isRunningInDockerContainer()
 	var err error
-	if SiyuanAccessAuthCodeBypass, err = strconv.ParseBool(os.Getenv("SIYUAN_ACCESS_AUTH_CODE_BYPASS")); err != nil {
-		SiyuanAccessAuthCodeBypass = false
+	if SiYuanAccessAuthCodeBypass, err = strconv.ParseBool(os.Getenv("SIYUAN_ACCESS_AUTH_CODE_BYPASS")); err != nil {
+		SiYuanAccessAuthCodeBypass = false
 	}
-	SiyuanAccessAuthCodeViaEnvvar = os.Getenv("SIYUAN_ACCESS_AUTH_CODE")
 }
 
 var (
 	bootProgress = atomic.Int32{} // 启动进度，从 0 到 100
 	bootDetails  string           // 启动细节描述
+	HttpServer   *http.Server     // HTTP 伺服器实例
 	HttpServing  = false          // 是否 HTTP 伺服已经可用
 )
 
@@ -101,16 +96,16 @@ func Boot() {
 	readOnly := flag.String("readonly", "false", "read-only mode")
 	accessAuthCode := flag.String("accessAuthCode", "", "access auth code")
 	ssl := flag.Bool("ssl", false, "for https and wss")
-	lang := flag.String("lang", "", "ar_SA/de_DE/en_US/es_ES/fr_FR/he_IL/it_IT/ja_JP/pl_PL/pt_BR/ru_RU/zh_CHT/zh_CN")
+	lang := flag.String("lang", "", "ar_SA/de_DE/en_US/es_ES/fr_FR/he_IL/it_IT/ja_JP/ko_KR/pl_PL/pt_BR/ru_RU/sk_SK/tr_TR/zh_CHT/zh_CN")
 	mode := flag.String("mode", "prod", "dev/prod")
 	flag.Parse()
 
 	// Fallback to env vars if commandline args are not set
 	// valid only for CLI args that default to "", as the
 	// others have explicit (sane) defaults
-	workspacePath = coalesceToEnvVar(workspacePath, SIYUAN_WORKSPACE)
-	accessAuthCode = coalesceToEnvVar(accessAuthCode, SIYUAN_ACCESS_AUTH_CODE)
-	lang = coalesceToEnvVar(lang, SIYUAN_LANG)
+	workspacePath = coalesceToEnvVar(workspacePath, "SIYUAN_WORKSPACE_PATH")
+	accessAuthCode = coalesceToEnvVar(accessAuthCode, "SIYUAN_ACCESS_AUTH_CODE")
+	lang = coalesceToEnvVar(lang, "SIYUAN_LANG")
 
 	if "" != *wdPath {
 		WorkingDir = *wdPath
@@ -131,7 +126,7 @@ func Boot() {
 			interruptBoot := true
 
 			// Set the env `SIYUAN_ACCESS_AUTH_CODE_BYPASS=true` to skip checking empty access auth code https://github.com/siyuan-note/siyuan/issues/9709
-			if SiyuanAccessAuthCodeBypass {
+			if SiYuanAccessAuthCodeBypass {
 				interruptBoot = false
 				fmt.Println("bypass access auth code check since the env [SIYUAN_ACCESS_AUTH_CODE_BYPASS] is set to [true]")
 			}
@@ -140,7 +135,7 @@ func Boot() {
 				// The access authorization code command line parameter must be set when deploying via Docker https://github.com/siyuan-note/siyuan/issues/9328
 				fmt.Printf("the access authorization code command line parameter (--accessAuthCode) must be set when deploying via Docker\n")
 				fmt.Printf("or you can set the SIYUAN_ACCESS_AUTH_CODE env var")
-				os.Exit(1)
+				os.Exit(logging.ExitCodeSecurityRisk)
 			}
 		}
 	}
@@ -345,10 +340,19 @@ func ReadWorkspacePaths() (ret []string, err error) {
 	}
 
 	var tmp []string
+	workspaceBaseDir := filepath.Dir(HomeDir)
 	for _, d := range ret {
+		if ContainerIOS == Container && strings.Contains(d, "/Documents/") {
+			// iOS 端沙箱路径会变化，需要转换为相对路径再拼接当前沙箱中的工作空间基路径
+			d = d[strings.Index(d, "/Documents/")+len("/Documents/"):]
+			d = filepath.Join(workspaceBaseDir, d)
+		}
+
 		d = strings.TrimRight(d, " \t\n") // 去掉工作空间路径尾部空格 https://github.com/siyuan-note/siyuan/issues/6353
 		if gulu.File.IsDir(d) {
 			tmp = append(tmp, d)
+		} else {
+			logging.LogWarnf("workspace path [%s] is not a dir", d)
 		}
 	}
 	ret = tmp
@@ -479,6 +483,7 @@ func initMime() {
 	mime.AddExtensionType(".gif", "image/gif")
 	mime.AddExtensionType(".bmp", "image/bmp")
 	mime.AddExtensionType(".tiff", "image/tiff")
+	mime.AddExtensionType(".tif", "image/tiff")
 	mime.AddExtensionType(".webp", "image/webp")
 	mime.AddExtensionType(".ico", "image/x-icon")
 }

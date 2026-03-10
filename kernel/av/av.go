@@ -18,6 +18,7 @@
 package av
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -146,6 +147,12 @@ type Key struct {
 
 	// 日期
 	Date *Date `json:"date,omitempty"` // 日期设置
+
+	// 创建时间
+	Created *Created `json:"created,omitempty"` // 创建时间设置
+
+	// 更新时间
+	Updated *Updated `json:"updated,omitempty"` // 更新时间设置
 }
 
 func NewKey(id, name, icon string, keyType KeyType) *Key {
@@ -165,6 +172,14 @@ func (k *Key) GetOption(name string) (ret *SelectOption) {
 		}
 	}
 	return
+}
+
+type Created struct {
+	IncludeTime bool `json:"includeTime"` // 是否填充具体时间 Add `Include time` switch to database creation time field and update time field https://github.com/siyuan-note/siyuan/issues/12091
+}
+
+type Updated struct {
+	IncludeTime bool `json:"includeTime"` // 是否填充具体时间 Add `Include time` switch to database creation time field and update time field https://github.com/siyuan-note/siyuan/issues/12091
 }
 
 type Date struct {
@@ -221,6 +236,17 @@ type View struct {
 	GroupFolded  bool       `json:"groupFolded"`         // 分组是否折叠
 	GroupHidden  int        `json:"groupHidden"`         // 分组是否隐藏，0：显示，1：空白隐藏，2：手动隐藏
 	GroupSort    int        `json:"groupSort"`           // 分组排序值，用于手动排序
+}
+
+// ViewData 用于序列化视图数据到前端。
+type ViewData struct {
+	ID               string     `json:"id"`
+	Icon             string     `json:"icon"`
+	Name             string     `json:"name"`
+	Desc             string     `json:"desc"`
+	HideAttrViewName bool       `json:"hideAttrViewName"`
+	Type             LayoutType `json:"type"`
+	PageSize         int        `json:"pageSize"`
 }
 
 func (view *View) IsGroupView() bool {
@@ -396,11 +422,12 @@ type Viewable interface {
 func NewAttributeView(id string) (ret *AttributeView) {
 	view, blockKey, selectKey := NewTableViewWithBlockKey(ast.NewNodeID())
 	ret = &AttributeView{
-		Spec:      3,
-		ID:        id,
-		KeyValues: []*KeyValues{{Key: blockKey}, {Key: selectKey}},
-		ViewID:    view.ID,
-		Views:     []*View{view},
+		Spec:              CurrentSpec,
+		ID:                id,
+		KeyValues:         []*KeyValues{{Key: blockKey}, {Key: selectKey}},
+		ViewID:            view.ID,
+		Views:             []*View{view},
+		RenderedViewables: map[string]Viewable{},
 	}
 	return
 }
@@ -429,6 +456,52 @@ func GetAttributeViewNameByPath(avJSONPath string) (ret string, err error) {
 	return
 }
 
+func GetAttributeViewContent(avID string) (content string) {
+	if "" == avID {
+		return
+	}
+
+	attrView, err := ParseAttributeView(avID)
+	if err != nil {
+		logging.LogErrorf("parse attribute view [%s] failed: %s", avID, err)
+		return
+	}
+	return getAttributeViewContent0(attrView)
+}
+
+func GetAttributeViewContentByPath(avJSONPath string) (content string) {
+	attrView, err := ParseAttributeViewByPath(avJSONPath)
+	if err != nil {
+		logging.LogErrorf("parse attribute view [%s] failed: %s", avJSONPath, err)
+		return
+	}
+	return getAttributeViewContent0(attrView)
+}
+
+func getAttributeViewContent0(attrView *AttributeView) (content string) {
+	buf := bytes.Buffer{}
+	buf.WriteString(attrView.Name)
+	buf.WriteByte(' ')
+	for _, v := range attrView.Views {
+		buf.WriteString(v.Name)
+		buf.WriteByte(' ')
+	}
+
+	for _, keyValues := range attrView.KeyValues {
+		buf.WriteString(keyValues.Key.Name)
+		buf.WriteByte(' ')
+		for _, value := range keyValues.Values {
+			if nil != value {
+				buf.WriteString(value.String(true))
+				buf.WriteByte(' ')
+			}
+		}
+	}
+
+	content = strings.TrimSpace(buf.String())
+	return
+}
+
 func IsAttributeViewExist(avID string) bool {
 	avJSONPath := GetAttributeViewDataPath(avID)
 	return filelock.IsExist(avJSONPath)
@@ -436,11 +509,17 @@ func IsAttributeViewExist(avID string) bool {
 
 func ParseAttributeView(avID string) (ret *AttributeView, err error) {
 	avJSONPath := GetAttributeViewDataPath(avID)
+	return ParseAttributeViewByPath(avJSONPath)
+}
+
+func ParseAttributeViewByPath(avJSONPath string) (ret *AttributeView, err error) {
 	if !filelock.IsExist(avJSONPath) {
 		err = ErrViewNotFound
 		return
 	}
 
+	avID := filepath.Base(avJSONPath)
+	avID = strings.TrimSuffix(avID, filepath.Ext(avID))
 	data, readErr := filelock.ReadFile(avJSONPath)
 	if nil != readErr {
 		logging.LogErrorf("read attribute view [%s] failed: %s", avID, readErr)
@@ -519,22 +598,24 @@ func SaveAttributeView(av *AttributeView) (err error) {
 
 	// 值去重
 	blockValues := av.GetBlockKeyValues()
-	blockIDs := map[string]bool{}
-	var duplicatedValueIDs []string
-	for _, blockValue := range blockValues.Values {
-		if !blockIDs[blockValue.BlockID] {
-			blockIDs[blockValue.BlockID] = true
-		} else {
-			duplicatedValueIDs = append(duplicatedValueIDs, blockValue.ID)
+	if nil != blockValues {
+		blockIDs := map[string]bool{}
+		var duplicatedValueIDs []string
+		for _, blockValue := range blockValues.Values {
+			if !blockIDs[blockValue.BlockID] {
+				blockIDs[blockValue.BlockID] = true
+			} else {
+				duplicatedValueIDs = append(duplicatedValueIDs, blockValue.ID)
+			}
 		}
-	}
-	var tmp []*Value
-	for _, blockValue := range blockValues.Values {
-		if !gulu.Str.Contains(blockValue.ID, duplicatedValueIDs) {
-			tmp = append(tmp, blockValue)
+		var tmp []*Value
+		for _, blockValue := range blockValues.Values {
+			if !gulu.Str.Contains(blockValue.ID, duplicatedValueIDs) {
+				tmp = append(tmp, blockValue)
+			}
 		}
+		blockValues.Values = tmp
 	}
-	blockValues.Values = tmp
 
 	// 视图值去重
 	for _, view := range av.Views {
@@ -731,6 +812,13 @@ func (av *AttributeView) Clone() (ret *AttributeView) {
 		oldKeyIDs = append(oldKeyIDs, kv.Key.ID)
 		kv.Key.ID = newID
 		kv.Values = []*Value{}
+
+		if KeyTypeRelation == kv.Key.Type {
+			// 断开关联
+			kv.Key.Relation.IsTwoWay = false
+			kv.Key.Relation.AvID = ""
+			kv.Key.Relation.BackKeyID = ""
+		}
 	}
 
 	oldKeyIDs = gulu.Str.RemoveDuplicatedElem(oldKeyIDs)
@@ -802,9 +890,10 @@ func GetAttributeViewI18n(key string) string {
 }
 
 var (
-	ErrViewNotFound    = errors.New("view not found")
-	ErrKeyNotFound     = errors.New("key not found")
-	ErrWrongLayoutType = errors.New("wrong layout type")
+	ErrAttributeViewNotFound = errors.New("attribute view not found")
+	ErrViewNotFound          = errors.New("view not found")
+	ErrKeyNotFound           = errors.New("key not found")
+	ErrWrongLayoutType       = errors.New("wrong layout type")
 )
 
 const (

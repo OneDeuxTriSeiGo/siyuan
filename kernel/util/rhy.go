@@ -17,6 +17,7 @@
 package util
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -25,28 +26,32 @@ import (
 	"github.com/imroc/req/v3"
 	"github.com/siyuan-note/httpclient"
 	"github.com/siyuan-note/logging"
+	"golang.org/x/sync/singleflight"
 )
 
+var (
+	RhyCacheDuration = int64(3600 * 6)
 
-var cachedBazaarResult = map[string]interface{}{}
-var bazaarResultCacheTime int64
+	cachedRhyResult    = map[string]interface{}{}
+	rhyResultCacheTime int64
+    rhyResultLock      = sync.Mutex{}
+	rhyResultFlight    singleflight.Group
 
-//var cachedReleaseResult = map[string]interface{}{}
-//var releaseResultCacheTime int64
+    cachedBazaarResult = map[string]interface{}{}
+    bazaarResultCacheTime int64
 
-var aggregateResultCacheTime int64
-var rhyResultLock = sync.Mutex{}
-var cachedRhyResult = map[string]interface{}{}
+    //cachedReleaseResult = map[string]interface{}{}
+    //releaseResultCacheTime int64
+)
 
 func NewGitHubApiRequest() *req.Request {
 	return httpclient.NewCloudRequest30s().SetHeader("Accept", "application/vnd.github+json").SetHeader("X-GitHub-Api-Version", "2022-11-28")
 }
 
 // Query GitHub Releases for the Client
-//func GetReleaseResult(force bool, cacheDuration int64) (map[string]interface{}, error) {
+//func GetReleaseResult() (map[string]interface{}, error) {
 //
-//	now := time.Now().Unix()
-//	if cacheDuration >= now - releaseResultCacheTime && !force && 0 < len(cachedReleaseResult) {
+//	if RhyCacheDuration >= time.Now().Unix() - releaseResultCacheTime && 0 < len(cachedReleaseResult) {
 //		return cachedRhyResult, nil
 //	}
 //
@@ -61,15 +66,14 @@ func NewGitHubApiRequest() *req.Request {
 //		logging.LogErrorf(msg)
 //		return nil, errors.New(msg)
 //	}
-//	releaseResultCacheTime = now
+//	releaseResultCacheTime = time.Now().Unix()
 //	return cachedReleaseResult, nil
 //}
 
 // Query the GitHub Bazaar Repo's Main Branch
-func GetBazaarResult(force bool, cacheDuration int64) (map[string]interface{}, error) {
+func GetBazaarResult() (map[string]interface{}, error) {
 
-	now := time.Now().Unix()
-	if cacheDuration >= now - bazaarResultCacheTime && !force && 0 < len(cachedBazaarResult) {
+	if RhyCacheDuration >= time.Now().Unix() - bazaarResultCacheTime && 0 < len(cachedBazaarResult) {
 		return cachedBazaarResult, nil
 	}
 
@@ -85,50 +89,59 @@ func GetBazaarResult(force bool, cacheDuration int64) (map[string]interface{}, e
 		logging.LogErrorf(msg)
 		return nil, errors.New(msg)
 	}
-	bazaarResultCacheTime = now
+	bazaarResultCacheTime = time.Now().Unix()
 	return cachedBazaarResult, nil
 }
 
 // Function Replaced to Directly Query Github.
-func GetRhyResult(force bool) (map[string]interface{}, error) {
-
-	rhyResultLock.Lock()
-	defer rhyResultLock.Unlock()
-
-	cacheDuration := int64(3600 * 6)
+func GetRhyResult(ctx context.Context, force bool) (map[string]interface{}, error) {
 	if ContainerDocker == Container {
-		cacheDuration = int64(3600 * 24)
+		RhyCacheDuration = int64(3600 * 24)
 	}
-	now := time.Now().Unix()
-	if cacheDuration >= now - aggregateResultCacheTime && !force && 0 < len(cachedBazaarResult) {
+
+	if RhyCacheDuration >= time.Now().Unix()-rhyResultCacheTime && !force && 0 < len(cachedRhyResult) {
 		return cachedRhyResult, nil
 	}
 
-	//respRelease, errRelease := GetReleaseResult(force, cacheDuration)
+	// 并发调用只执行一次实际请求
+	v, err, _ := rhyResultFlight.Do("rhyResult", func() (interface{}, error) {
+		return getRhyResult0(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(map[string]interface{}), nil
+}
+
+func getRhyResult0(ctx context.Context) (map[string]interface{}, error) {
+	rhyResultLock.Lock()
+	defer rhyResultLock.Unlock()
+
+	//respRelease, errRelease := GetReleaseResult()
 	//if errRelease != nil {
 	//	nil, errRelease
 	//}
 
-	respBazaar, errBazaar := GetBazaarResult(force, cacheDuration)
+	respBazaar, errBazaar := GetBazaarResult()
 	if errBazaar != nil {
 		return nil, errBazaar
 	}
 
-	cachedRhyResult = make(map[string]interface{})
 	cachedRhyResult["bazaar"] = respBazaar["commit"].(map[string]interface{})["sha"]
 
-	//aggregateResultCacheTime = min(releaseResultCacheTime, bazaarResultCacheTime)
-	aggregateResultCacheTime = bazaarResultCacheTime
+	//rhyResultCacheTime = min(releaseResultCacheTime, bazaarResultCacheTime)
+	rhyResultCacheTime = bazaarResultCacheTime
+
 	return cachedRhyResult, nil
 }
 
 func RefreshRhyResultJob() {
-	_, err := GetRhyResult(true)
+	_, err := GetRhyResult(context.TODO(), true)
 	if nil != err {
 		// 系统唤醒后可能还没有网络连接，这里等待后再重试
 		go func() {
 			time.Sleep(7 * time.Second)
-			GetRhyResult(true)
+			GetRhyResult(context.TODO(), true)
 		}()
 	}
 }

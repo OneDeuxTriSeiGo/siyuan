@@ -749,32 +749,50 @@ func filterTextContent(operator FilterOperator, valueContent, otherValueContent 
 		if "" == strings.TrimSpace(otherValueContent) {
 			return true
 		}
-		return valueContent == otherValueContent
+		if util.SearchCaseSensitive {
+			return valueContent == otherValueContent
+		}
+		return strings.EqualFold(valueContent, otherValueContent)
 	case FilterOperatorIsNotEqual:
 		if "" == strings.TrimSpace(otherValueContent) {
 			return true
 		}
-		return valueContent != otherValueContent
+		if util.SearchCaseSensitive {
+			return valueContent != otherValueContent
+		}
+		return !strings.EqualFold(valueContent, otherValueContent)
 	case FilterOperatorContains:
 		if "" == strings.TrimSpace(otherValueContent) {
 			return true
 		}
-		return strings.Contains(valueContent, otherValueContent)
+		if util.SearchCaseSensitive {
+			return strings.Contains(valueContent, otherValueContent)
+		}
+		return strings.Contains(strings.ToLower(valueContent), strings.ToLower(otherValueContent))
 	case FilterOperatorDoesNotContain:
 		if "" == strings.TrimSpace(otherValueContent) {
 			return true
 		}
-		return !strings.Contains(valueContent, otherValueContent)
+		if util.SearchCaseSensitive {
+			return !strings.Contains(valueContent, otherValueContent)
+		}
+		return !strings.Contains(strings.ToLower(valueContent), strings.ToLower(otherValueContent))
 	case FilterOperatorStartsWith:
 		if "" == strings.TrimSpace(otherValueContent) {
 			return true
 		}
-		return strings.HasPrefix(valueContent, otherValueContent)
+		if util.SearchCaseSensitive {
+			return strings.HasPrefix(valueContent, otherValueContent)
+		}
+		return strings.HasPrefix(strings.ToLower(valueContent), strings.ToLower(otherValueContent))
 	case FilterOperatorEndsWith:
 		if "" == strings.TrimSpace(otherValueContent) {
 			return true
 		}
-		return strings.HasSuffix(valueContent, otherValueContent)
+		if util.SearchCaseSensitive {
+			return strings.HasSuffix(valueContent, otherValueContent)
+		}
+		return strings.HasSuffix(strings.ToLower(valueContent), strings.ToLower(otherValueContent))
 	case FilterOperatorIsEmpty:
 		return "" == strings.TrimSpace(valueContent)
 	case FilterOperatorIsNotEmpty:
@@ -938,10 +956,10 @@ func calcRelativeTimeRegion(count int, unit RelativeDateUnit, direction Relative
 			// 结束时间：今天的 23:59:59.999999999
 			end = time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
 		case RelativeDateDirectionAfter:
-			// 开始时间：今天的 23:59:59.999999999
-			start = time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
-			// 结束时间：开始时间加上 count 天
-			end = start.AddDate(0, 0, count)
+			// 开始时间：今天的 0 点加上 count 天
+			start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, count)
+			// 结束时间：开始时间的 23:59:59.999999999
+			end = time.Date(start.Year(), start.Month(), start.Day(), 23, 59, 59, 999999999, now.Location())
 		}
 	case RelativeDateUnitWeek:
 		weekday := int(now.Weekday())
@@ -960,10 +978,10 @@ func calcRelativeTimeRegion(count int, unit RelativeDateUnit, direction Relative
 			// 结束时间：本周的周日
 			end = time.Date(now.Year(), now.Month(), now.Day()-weekday+7, 23, 59, 59, 999999999, now.Location())
 		case RelativeDateDirectionAfter:
-			//  开始时间：本周的周日
-			start = time.Date(now.Year(), now.Month(), now.Day()-weekday+7, 23, 59, 59, 999999999, now.Location())
-			// 结束时间：开始时间加上 count*7 天
-			end = start.AddDate(0, 0, count*7)
+			// 开始时间：本周的周一加上 count*7 天
+			start = time.Date(now.Year(), now.Month(), now.Day()-weekday+1, 0, 0, 0, 0, now.Location()).AddDate(0, 0, count*7)
+			// 结束时间：开始时间的周日
+			end = time.Date(start.Year(), start.Month(), start.Day()-int(start.Weekday())+7, 23, 59, 59, 999999999, now.Location())
 		}
 	case RelativeDateUnitMonth:
 		switch direction {
@@ -978,10 +996,10 @@ func calcRelativeTimeRegion(count int, unit RelativeDateUnit, direction Relative
 			// 结束时间：下个月的 1 号减去 1 纳秒
 			end = time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
 		case RelativeDateDirectionAfter:
-			// 开始时间：下个月的 1 号减去 1 纳秒
-			start = time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
-			// 结束时间：开始时间加上 count 个月
-			end = start.AddDate(0, count, 0)
+			// 开始时间：count 个月后的 1 号
+			start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, count, 0)
+			// 结束时间：开始时间的下个月的 1 号减去 1 纳秒
+			end = time.Date(start.Year(), start.Month()+1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
 		}
 	case RelativeDateUnitYear:
 		switch direction {
@@ -996,13 +1014,26 @@ func calcRelativeTimeRegion(count int, unit RelativeDateUnit, direction Relative
 			// 结束时间：明年的 1 月 1 号减去 1 纳秒
 			end = time.Date(now.Year()+1, 1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
 		case RelativeDateDirectionAfter:
-			// 开始时间：今年的 12 月 31 号
-			start = time.Date(now.Year(), 12, 31, 23, 59, 59, 999999999, now.Location())
-			// 结束时间：开始时间加上 count 年
-			end = start.AddDate(count, 0, 0)
+			// 开始时间：count 年后的 1 月 1 号
+			start = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).AddDate(count, 0, 0)
+			// 结束时间：开始时间的 count+1 年的 1 月 1 号减去 1 纳秒
+			end = time.Date(start.Year()+1, 1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
 		}
 	}
 	return
+}
+
+func (filter *ViewFilter) IsValid() bool {
+	if nil == filter || nil == filter.Value {
+		return false
+	}
+
+	if FilterOperatorIsEmpty != filter.Operator && FilterOperatorIsNotEmpty != filter.Operator {
+		if filter.Value.IsEmpty() && nil == filter.RelativeDate {
+			return false
+		}
+	}
+	return true
 }
 
 func (filter *ViewFilter) GetAffectValue(key *Key, addingBlockID string) (ret *Value) {

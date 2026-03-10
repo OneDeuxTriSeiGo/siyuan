@@ -82,14 +82,14 @@ func GetGitHubBazaarBranch() string {
 
 const (
 	chinaServer            = "https://chinaServer.invalid"             // 中国大陆云端服务地址，阿里云负载均衡，用于接口（数据同步文件上传、下载会走七牛云 OSS ChinaSyncServer）
-	chinaWebSocketServer   = "wss://chinaWebSocketServer.invalid"      // 中国大陆云端服务地址，阿里云负载均衡，用于接口（数据同步文件上传、下载会走七牛云 OSS ChinaSyncServer）
+	chinaWebSocketServer   = "wss://chinaWebSocketServer.invalid"      // 中国大陆云端 WebSocket 服务地址，阿里云负载均衡
 	chinaSyncServer        = "https://chinaSyncServer.invalid/"        // 中国大陆云端数据同步服务地址，七牛云 OSS，用于数据同步文件上传、下载
 	chinaCloudAssetsServer = "https://chinaCloudAssetsServer.invalid/" // 中国大陆云端图床服务地址，用于导出预览模式下订阅会员渲染图床
 	chinaAccountServer     = "https://chinaAccountServer.invalid"      // 中国大陆链滴服务地址，用于账号登录、分享发布帖子
 	chinaForumAssetsServer = "https://chinaForumAssetsServer.invalid/" // 中国大陆链滴图床服务地址，用于发布文章到社区
 
-	northAmericaServer            = "https://northAmericaServer.invalid"             // 北美云端服务地址，Cloudflare
-	northAmericaWebSocketServer   = "wss://northAmericaWebSocketServer.invalid"      // 北美云端服务地址，Cloudflare，用于接口，数据同步文件上传、下载会走七牛云 OSS ChinaSyncServer
+	northAmericaServer            = "https://northAmericaServer.invalid"             // 北美云端服务地址，Cloudflare，用于接口（数据同步文件上传、下载会走七牛云 OSS northAmericaSyncServer）
+	northAmericaWebSocketServer   = "wss://northAmericaWebSocketServer.invalid"      // 北美云端 WebSocket 服务地址，Cloudflare，
 	northAmericaSyncServer        = "https://northAmericaSyncServer.invalid/"        // 北美云端数据同步服务地址，七牛云 OSS，用于数据同步文件上传、下载
 	northAmericaCloudAssetsServer = "https://northAmericaCloudAssetsServer.invalid/" // 北美云端图床服务地址，用于导出预览模式下订阅会员渲染图床
 	northAmericaAccountServer     = "https://northAmericaAccountServer.invalid"      // 流云服务地址，用于账号登录、分享发布帖子

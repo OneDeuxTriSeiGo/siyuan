@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"runtime/debug"
 	"sync"
@@ -30,12 +31,14 @@ import (
 	"github.com/siyuan-note/eventbus"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/siyuan/kernel/task"
+	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
 var (
 	operationQueue []*dbQueueOperation
 	dbQueueLock    = sync.Mutex{}
+	dbQueueCond    = sync.NewCond(&dbQueueLock)
 	txLock         = sync.Mutex{}
 )
 
@@ -58,6 +61,38 @@ func FlushTxJob() {
 	task.AppendTask(task.DatabaseIndexCommit, FlushQueue)
 }
 
+func WaitFlushTx() {
+	dbQueueLock.Lock()
+	defer dbQueueLock.Unlock()
+
+	var printLog, lastPrintLog bool
+	var i int
+
+	for len(operationQueue) > 0 || flushingTx.Load() {
+		if i == 0 {
+			// 第一次等待时使用较短的超时
+			dbQueueCond.Wait()
+		} else {
+			// 后续等待添加超时检测，用于打印警告日志
+			timer := time.AfterFunc(50*time.Millisecond, func() {
+				dbQueueCond.Broadcast()
+			})
+			dbQueueCond.Wait()
+			timer.Stop()
+		}
+
+		i++
+		if 200 < i && !printLog { // 10s 后打日志
+			logging.LogWarnf("database is writing: \n%s", logging.ShortStack())
+			printLog = true
+		}
+		if 1200 < i && !lastPrintLog { // 60s 后打日志
+			logging.LogWarnf("database is still writing")
+			lastPrintLog = true
+		}
+	}
+}
+
 func ClearQueue() {
 	dbQueueLock.Lock()
 	defer dbQueueLock.Unlock()
@@ -67,6 +102,9 @@ func ClearQueue() {
 var flushingTx = atomic.Bool{}
 
 func FlushQueue() {
+	initDatabaseLock.Lock()
+	defer initDatabaseLock.Unlock()
+
 	ops := getOperations()
 	total := len(ops)
 	if 1 > total && !flushingTx.Load() {
@@ -78,9 +116,37 @@ func FlushQueue() {
 	defer func() {
 		flushingTx.Store(false)
 		txLock.Unlock()
+		// 通知等待的协程队列已刷新完成
+		dbQueueCond.Broadcast()
 	}()
 
 	start := time.Now()
+
+	// logging.LogInfof("flushing database queue, total operations [%d]", total)
+
+	// 如果有重命名子树的操作，则统计各路径前缀的块树数量，数量较大的话阻塞整个队列，以便尽可能合并重命名子树的操作
+	var renameSubTreeOp *dbQueueOperation
+	for _, op := range ops {
+		if "rename_sub_tree" == op.action {
+			renameSubTreeOp = op
+			break
+		}
+	}
+	if nil != renameSubTreeOp {
+		childCount := treenode.CountBlockTreesByPathPrefix(path.Dir(renameSubTreeOp.renameTree.Path))
+		if 512 < childCount {
+			scale := math.Log(float64(childCount)/512.0+1.0) / math.Log(2.0)
+			secs := 1.0 * scale
+			if secs < 1.0 {
+				secs = 1.0
+			}
+			if secs > 12.0 {
+				secs = 12.0
+			}
+			logging.LogInfof("rename sub tree [%s] with large child count [%d], sleep [%.2fs] to wait for more operations", renameSubTreeOp.renameTree.Path, childCount, secs)
+			time.Sleep(time.Duration(secs * float64(time.Second)))
+		}
+	}
 
 	context := map[string]interface{}{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar}
 	if 512 < len(ops) {
@@ -109,6 +175,7 @@ func FlushQueue() {
 		context["total"] = groupOpsTotal[op.action]
 		if err = execOp(op, tx, context); err != nil {
 			tx.Rollback()
+			closeTxPreparedStmts(tx)
 			logging.LogErrorf("queue operation [%s] failed: %s", op.action, err)
 			continue
 		}

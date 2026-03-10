@@ -4,7 +4,7 @@ import {isMobile} from "./functions";
 import {fetchPost} from "./fetch";
 import {Dialog} from "../dialog";
 import {getOpenNotebookCount} from "./pathName";
-import {validateName} from "../editor/rename";
+import {replaceFileName, validateName} from "../editor/rename";
 import {setStorageVal} from "../protyle/util/compatibility";
 import {openFileById} from "../editor/util";
 import {openMobileFileById} from "../mobile/editor";
@@ -16,9 +16,9 @@ export const fetchNewDailyNote = (app: App, notebook: string) => {
         app: Constants.SIYUAN_APPID,
     }, (response) => {
         /// #if MOBILE
-        openMobileFileById(app, response.data.id);
+        openMobileFileById(app, response.data.id, [Constants.CB_GET_SCROLL, Constants.CB_GET_FOCUS]);
         /// #else
-        openFileById({app, id: response.data.id, action: [Constants.CB_GET_FOCUS]});
+        openFileById({app, id: response.data.id, action: [Constants.CB_GET_SCROLL, Constants.CB_GET_FOCUS]});
         /// #endif
     });
 };
@@ -123,10 +123,11 @@ export const newNotebook = () => {
         dialog.destroy();
     });
     btnsElement[1].addEventListener("click", () => {
-        const name = dialog.element.querySelector("input").value;
+        let name = dialog.element.querySelector("input").value;
         if (!validateName(name)) {
             return false;
         }
+        name = replaceFileName(name);
         fetchPost("/api/notebook/createNotebook", {
             name
         });

@@ -24,6 +24,7 @@ const setEditor = (modelMainElement: Element) => {
         inlineStrikethrough: (modelMainElement.querySelector("#editorMarkdownInlineStrikethrough") as HTMLInputElement).checked,
         inlineMark: (modelMainElement.querySelector("#editorMarkdownInlineMark") as HTMLInputElement).checked
     };
+    window.siyuan.config.editor.allowSVGScript = (modelMainElement.querySelector("#allowSVGScript") as HTMLInputElement).checked;
     window.siyuan.config.editor.allowHTMLBLockScript = (modelMainElement.querySelector("#allowHTMLBLockScript") as HTMLInputElement).checked;
     window.siyuan.config.editor.dynamicLoadBlocks = dynamicLoadBlocks;
     window.siyuan.config.editor.justify = (modelMainElement.querySelector("#justify") as HTMLInputElement).checked;
@@ -42,8 +43,8 @@ const setEditor = (modelMainElement: Element) => {
     window.siyuan.config.editor.katexMacros = (modelMainElement.querySelector("#katexMacros") as HTMLTextAreaElement).value;
     window.siyuan.config.editor.codeLineWrap = (modelMainElement.querySelector("#codeLineWrap") as HTMLInputElement).checked;
     window.siyuan.config.editor.virtualBlockRef = (modelMainElement.querySelector("#virtualBlockRef") as HTMLInputElement).checked;
-    window.siyuan.config.editor.virtualBlockRefInclude = (modelMainElement.querySelector("#virtualBlockRefInclude") as HTMLInputElement).value;
-    window.siyuan.config.editor.virtualBlockRefExclude = (modelMainElement.querySelector("#virtualBlockRefExclude") as HTMLInputElement).value;
+    window.siyuan.config.editor.virtualBlockRefInclude = (modelMainElement.querySelector("#virtualBlockRefInclude") as HTMLTextAreaElement).value;
+    window.siyuan.config.editor.virtualBlockRefExclude = (modelMainElement.querySelector("#virtualBlockRefExclude") as HTMLTextAreaElement).value;
     window.siyuan.config.editor.blockRefDynamicAnchorTextMaxLen = parseInt((modelMainElement.querySelector("#blockRefDynamicAnchorTextMaxLen") as HTMLInputElement).value);
     window.siyuan.config.editor.backlinkExpandCount = parseInt((modelMainElement.querySelector("#backlinkExpandCount") as HTMLInputElement).value);
     window.siyuan.config.editor.backmentionExpandCount = parseInt((modelMainElement.querySelector("#backmentionExpandCount") as HTMLInputElement).value);
@@ -193,13 +194,13 @@ export const initEditor = () => {
 <div class="b3-label">
     ${window.siyuan.languages.md9}
     <span class="fn__hr"></span>
-    <input class="b3-text-field fn__block" id="virtualBlockRefInclude" value="${window.siyuan.config.editor.virtualBlockRefInclude}" />
+    <textarea class="b3-text-field fn__block" id="virtualBlockRefInclude">${window.siyuan.config.editor.virtualBlockRefInclude}</textarea>
     <div class="b3-label__text">${window.siyuan.languages.md36}</div>
 </div>
 <div class="b3-label">
     ${window.siyuan.languages.md35}
     <span class="fn__hr"></span>
-    <input class="b3-text-field fn__block" id="virtualBlockRefExclude" value="${window.siyuan.config.editor.virtualBlockRefExclude}" />
+    <textarea class="b3-text-field fn__block" id="virtualBlockRefExclude">${window.siyuan.config.editor.virtualBlockRefExclude}</textarea>
     <div class="b3-label__text">${window.siyuan.languages.md36}</div>
     <div class="b3-label__text">${window.siyuan.languages.md41}</div>
 </div>
@@ -279,6 +280,14 @@ export const initEditor = () => {
     <textarea class="b3-text-field fn__block" id="katexMacros">${window.siyuan.config.editor.katexMacros}</textarea>
     <div class="b3-label__text">${window.siyuan.languages.katexMacrosTip}</div>
 </div>
+<label class="fn__flex b3-label">
+    <div class="fn__flex-1">
+       ${window.siyuan.languages.allowSVGScript}
+        <div class="b3-label__text">${window.siyuan.languages.allowSVGScriptTip}</div>
+    </div>
+    <span class="fn__space"></span>
+    <input class="b3-switch fn__flex-center" id="allowSVGScript" type="checkbox"${window.siyuan.config.editor.allowSVGScript ? " checked" : ""}/>
+</label>
 <label class="fn__flex b3-label">
     <div class="fn__flex-1">
        ${window.siyuan.languages.allowHTMLBLockScript}

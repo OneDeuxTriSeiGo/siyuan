@@ -35,10 +35,20 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-func RenderAttributeView(blockID, avID, viewID, query string, page, pageSize int, groupPaging map[string]interface{}) (viewable av.Viewable, attrView *av.AttributeView, err error) {
+func RenderAttributeView(blockID, avID, viewID, query string, page, pageSize int, groupPaging map[string]interface{}, createIfNotExist bool) (viewable av.Viewable, attrView *av.AttributeView, err error) {
 	waitForSyncingStorages()
 
 	if avJSONPath := av.GetAttributeViewDataPath(avID); !filelock.IsExist(avJSONPath) {
+		if !createIfNotExist {
+			err = av.ErrAttributeViewNotFound
+			return
+		}
+
+		if !ast.IsNodeIDPattern(avID) {
+			err = ErrInvalidID
+			return
+		}
+
 		attrView = av.NewAttributeView(avID)
 		if err = av.SaveAttributeView(attrView); err != nil {
 			logging.LogErrorf("save attribute view [%s] failed: %s", avID, err)
@@ -90,7 +100,21 @@ func renderAttributeView(attrView *av.AttributeView, nodeID, viewID, query strin
 func renderAttributeViewGroups(viewable av.Viewable, attrView *av.AttributeView, view *av.View, query string, page, pageSize int, groupPaging map[string]interface{}) (err error) {
 	groupKey := view.GetGroupKey(attrView)
 	if nil == groupKey {
-		return
+		if view.LayoutType == av.LayoutTypeKanban {
+			preferredGroupKey := getKanbanPreferredGroupKey(attrView)
+			group := &av.ViewGroup{Field: preferredGroupKey.ID}
+			setAttributeViewGroup(attrView, view, group)
+			if err = av.SaveAttributeView(attrView); err != nil {
+				logging.LogErrorf("save attribute view [%s] failed: %s", attrView.ID, err)
+				return
+			}
+			groupKey = view.GetGroupKey(attrView)
+			if nil == groupKey {
+				return
+			}
+		} else {
+			return
+		}
 	}
 
 	// 当前日期可能会变，所以如果是按日期分组则需要重新生成分组
@@ -98,17 +122,30 @@ func renderAttributeViewGroups(viewable av.Viewable, attrView *av.AttributeView,
 		createdDate := time.UnixMilli(view.GroupCreated).Format("2006-01-02")
 		if time.Now().Format("2006-01-02") != createdDate {
 			genAttrViewGroups(view, attrView) // 仅重新生成一个视图的分组以提升性能
-			av.SaveAttributeView(attrView)
+			if err = av.SaveAttributeView(attrView); err != nil {
+				logging.LogErrorf("save attribute view [%s] failed: %s", attrView.ID, err)
+				return
+			}
 		}
 	}
 
 	// 如果是按模板分组则需要重新生成分组
 	if isGroupByTemplate(attrView, view) {
 		genAttrViewGroups(view, attrView) // 仅重新生成一个视图的分组以提升性能
-		av.SaveAttributeView(attrView)
+		if err = av.SaveAttributeView(attrView); err != nil {
+			logging.LogErrorf("save attribute view [%s] failed: %s", attrView.ID, err)
+			return
+		}
 	}
 
-	// 如果存在分组的话渲染分组视图
+	// 渲染分组视图
+	if nil == view.Groups {
+		genAttrViewGroups(view, attrView)
+		if err = av.SaveAttributeView(attrView); err != nil {
+			logging.LogErrorf("save attribute view [%s] failed: %s", attrView.ID, err)
+			return
+		}
+	}
 
 	for _, groupView := range view.Groups {
 		groupView.Name = groupView.GetGroupValue()
@@ -406,7 +443,7 @@ func renderViewableInstance(viewable av.Viewable, view *av.View, attrView *av.At
 		gallery.Cards = gallery.Cards[start:end]
 	case av.LayoutTypeKanban:
 		kanban := viewable.(*av.Kanban)
-		kanban.CardCount = 0
+		kanban.CardCount = len(kanban.Cards)
 		kanban.PageSize = view.PageSize
 		if 1 > pageSize {
 			pageSize = kanban.PageSize
@@ -482,15 +519,28 @@ func RenderRepoSnapshotAttributeView(indexID, avID string) (viewable av.Viewable
 	}
 
 	if nil == avFile {
+		if !ast.IsNodeIDPattern(avID) {
+			err = ErrInvalidID
+			return
+		}
+
 		attrView = av.NewAttributeView(avID)
+		err = av.ErrAttributeViewNotFound
+		return
 	} else {
 		data, readErr := repo.OpenFile(avFile)
 		if nil != readErr {
 			logging.LogErrorf("read attribute view [%s] failed: %s", avID, readErr)
+			err = readErr
 			return
 		}
 
-		attrView = &av.AttributeView{RenderedViewables: map[string]av.Viewable{}}
+		if !ast.IsNodeIDPattern(avID) {
+			err = ErrInvalidID
+			return
+		}
+
+		attrView = av.NewAttributeView(avID)
 		if err = gulu.JSON.UnmarshalJSON(data, attrView); err != nil {
 			logging.LogErrorf("unmarshal attribute view [%s] failed: %s", avID, err)
 			return
@@ -505,6 +555,7 @@ func RenderHistoryAttributeView(blockID, avID, viewID, query string, page, pageS
 	createdUnix, parseErr := strconv.ParseInt(created, 10, 64)
 	if nil != parseErr {
 		logging.LogErrorf("parse created [%s] failed: %s", created, parseErr)
+		err = fmt.Errorf("parse created [%s] failed: %w", created, parseErr)
 		return
 	}
 
@@ -516,6 +567,7 @@ func RenderHistoryAttributeView(blockID, avID, viewID, query string, page, pageS
 		return
 	}
 	if 1 > len(matches) {
+		err = av.ErrAttributeViewNotFound
 		return
 	}
 
@@ -527,15 +579,28 @@ func RenderHistoryAttributeView(blockID, avID, viewID, query string, page, pageS
 	}
 	if !gulu.File.IsExist(avJSONPath) {
 		logging.LogWarnf("attribute view [%s] not found in current data", avID)
+		if !ast.IsNodeIDPattern(avID) {
+			err = ErrInvalidID
+			return
+		}
+
 		attrView = av.NewAttributeView(avID)
+		err = av.ErrAttributeViewNotFound
+		return
 	} else {
 		data, readErr := os.ReadFile(avJSONPath)
 		if nil != readErr {
 			logging.LogErrorf("read attribute view [%s] failed: %s", avID, readErr)
+			err = readErr
 			return
 		}
 
-		attrView = &av.AttributeView{RenderedViewables: map[string]av.Viewable{}}
+		if !ast.IsNodeIDPattern(avID) {
+			err = ErrInvalidID
+			return
+		}
+
+		attrView = av.NewAttributeView(avID)
 		if err = gulu.JSON.UnmarshalJSON(data, attrView); err != nil {
 			logging.LogErrorf("unmarshal attribute view [%s] failed: %s", avID, err)
 			return

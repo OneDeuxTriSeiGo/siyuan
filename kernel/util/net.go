@@ -33,19 +33,62 @@ import (
 	"github.com/siyuan-note/logging"
 )
 
-func ValidOptionalPort(port string) bool {
-	if port == "" {
-		return true
+// GetPrivateIPv4s 获取本地所有的私有 IPv4 地址（排除虚拟网卡）
+func GetPrivateIPv4s() (ret []string) {
+	ret = []string{}
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return
 	}
-	if port[0] != ':' {
-		return false
-	}
-	for _, b := range port[1:] {
-		if b < '0' || b > '9' {
-			return false
+
+	// 常见的虚拟网卡名称关键字黑名单
+	virtualKeywords := []string{"docker", "veth", "br-", "vmnet", "vbox", "utun", "tun", "tap", "bridge", "cloud", "hyper-"}
+
+	for _, itf := range interfaces {
+		// 1. 基础状态过滤：必须是启动状态且不能是回环网卡
+		if itf.Flags&net.FlagUp == 0 || itf.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		// 2. 硬件地址过滤：物理网卡通常必须有 MAC 地址
+		if len(itf.HardwareAddr) == 0 {
+			continue
+		}
+
+		// 3. 名称过滤：排除已知虚拟网卡前缀
+		name := strings.ToLower(itf.Name)
+		isVirtual := false
+		for _, kw := range virtualKeywords {
+			if strings.Contains(name, kw) {
+				isVirtual = true
+				break
+			}
+		}
+		if isVirtual {
+			continue
+		}
+
+		// 4. 提取并校验 IP
+		addrs, err := itf.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+
+			ip := ipNet.IP
+			// 仅保留 IPv4 且必须是私有局域网地址 (10.x, 172.16.x, 192.168.x)
+			if ip.To4() != nil && ip.IsPrivate() {
+				ret = append(ret, ip.String())
+			}
 		}
 	}
-	return true
+	return
 }
 
 func IsLocalHostname(hostname string) bool {
@@ -67,8 +110,8 @@ func IsLocalHost(host string) bool {
 }
 
 func IsLocalOrigin(origin string) bool {
-	if url, err := url.Parse(origin); err == nil {
-		return IsLocalHostname(url.Hostname())
+	if u, err := url.Parse(origin); err == nil {
+		return IsLocalHostname(u.Hostname())
 	}
 	return false
 }
@@ -121,7 +164,6 @@ func isOnline(checkURL string, skipTlsVerify bool, timeout int) (ret bool) {
 
 	for i := 0; i < 2; i++ {
 		resp, err := c.R().Get(checkURL)
-
 		if resp.GetHeader("Location") != "" {
 			return true
 		}
@@ -140,8 +182,8 @@ func isOnline(checkURL string, skipTlsVerify bool, timeout int) (ret bool) {
 			break
 		}
 
-		time.Sleep(1 * time.Second)
 		logging.LogWarnf("check url [%s] is online failed: %s", checkURL, err)
+		time.Sleep(1 * time.Second)
 	}
 	return
 }
@@ -181,21 +223,16 @@ func InvalidIDPattern(idArg string, result *gulu.Result) bool {
 	return true
 }
 
-func IsValidURL(str string) bool {
-	_, err := url.Parse(str)
-	return err == nil
-}
-
 func initHttpClient() {
 	http.DefaultClient = httpclient.GetCloudFileClient2Min()
 	http.DefaultTransport = httpclient.NewTransport(false)
 }
 
 func ParsePort(portString string) (uint16, error) {
-	if port, err := strconv.ParseUint(portString, 10, 16); err != nil {
+	port, err := strconv.ParseUint(portString, 10, 16)
+	if err != nil {
 		logging.LogErrorf("parse port [%s] failed: %s", portString, err)
 		return 0, err
-	} else {
-		return uint16(port), nil
 	}
+	return uint16(port), nil
 }

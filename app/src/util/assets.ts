@@ -6,12 +6,24 @@ import {getAllModels} from "../layout/getAll";
 import {exportLayout} from "../layout/util";
 /// #endif
 import {fetchPost} from "./fetch";
-import {appearance} from "../config/appearance";
-import {isInAndroid, isInHarmony, isInIOS, isIPad, isIPhone, isMac, isWin11} from "../protyle/util/compatibility";
+import {
+    isInAndroid,
+    isInHarmony,
+    isInIOS,
+    isInMobileApp,
+    isIPad,
+    isIPhone,
+    isMac,
+    isWin11
+} from "../protyle/util/compatibility";
+import {setCodeTheme} from "../protyle/render/util";
+import {getBackend, getFrontend} from "./functions";
 
 export const loadAssets = (data: Config.IAppearance) => {
     const htmlElement = document.getElementsByTagName("html")[0];
     htmlElement.setAttribute("lang", window.siyuan.config.appearance.lang);
+    htmlElement.setAttribute("data-frontend", getFrontend()); // https://github.com/siyuan-note/siyuan/issues/12549
+    htmlElement.setAttribute("data-backend", getBackend());
     htmlElement.setAttribute("data-theme-mode", getThemeMode());
     htmlElement.setAttribute("data-light-theme", window.siyuan.config.appearance.themeLight);
     htmlElement.setAttribute("data-dark-theme", window.siyuan.config.appearance.themeDark);
@@ -23,7 +35,6 @@ export const loadAssets = (data: Config.IAppearance) => {
         fetchPost("/api/system/setAppearanceMode", {mode: OSTheme === "light" ? 0 : 1});
         window.siyuan.config.appearance.mode = (OSTheme === "light" ? 0 : 1);
     }
-
     const defaultStyleElement = document.getElementById("themeDefaultStyle");
     const defaultThemeAddress = `/appearance/themes/${data.mode === 1 ? "midnight" : "daylight"}/theme.css?v=${Constants.SIYUAN_VERSION}`;
     if (defaultStyleElement) {
@@ -199,7 +210,6 @@ export const initAssets = () => {
 };
 
 export const setInlineStyle = async (set = true, servePath = "../../../") => {
-    const height = Math.floor(window.siyuan.config.editor.fontSize * 1.625);
     let style;
     // Emojis Reset: 字体中包含了 emoji，需重置
     // Emojis Additional： 苹果/win11 字体中没有的 emoji
@@ -227,10 +237,9 @@ export const setInlineStyle = async (set = true, servePath = "../../../") => {
   local("Segoe UI Symbol");
   size-adjust: 115%;
 }`;
-    } else {
-        const isWin11Browser = await isWin11();
-        if (isWin11Browser) {
-            style = `@font-face {
+    } else if (await isWin11()) {
+        // Win11 Browser
+        style = `@font-face {
   font-family: "Emojis Additional";
   src: url(${servePath}appearance/fonts/Noto-COLRv1-2.047/Noto-COLRv1.woff2) format("woff2");
   unicode-range: U+1fae9, U+1fac6, U+1fabe, U+1fadc, U+e50a, U+1fa89, U+1fadf, U+1f1e6-1f1ff, U+1f3f4, U+e0067, U+e0062,
@@ -251,8 +260,8 @@ export const setInlineStyle = async (set = true, servePath = "../../../") => {
   local("Segoe UI Symbol");
   size-adjust: 85%;
 }`;
-        } else {
-            style = `@font-face {
+    } else {
+        style = `@font-face {
   font-family: "Emojis Reset";
   src: url(${servePath}appearance/fonts/Noto-COLRv1-2.047/Noto-COLRv1.woff2) format("woff2");
   unicode-range: U+1f170-1f171, U+1f17e, U+1f17f, U+1f21a, U+1f22f, U+1f232-1f23a, U+1f250, U+1f251, U+1f32b, U+1f3bc,
@@ -277,16 +286,14 @@ export const setInlineStyle = async (set = true, servePath = "../../../") => {
   local("EmojiSymbols");
   size-adjust: 92%;
 }`;
-        }
     }
-    let rtlCSS = "";
+    style += `\n:root { --b3-font-size-editor: ${window.siyuan.config.editor.fontSize}px }
+.b3-typography code:not(.hljs), .protyle-wysiwyg span[data-type~=code] { font-variant-ligatures: ${window.siyuan.config.editor.codeLigatures ? "normal" : "none"} }${window.siyuan.config.editor.justify ? "\n.protyle-wysiwyg [data-node-id] { text-align: justify }" : ""}`;
     if (window.siyuan.config.editor.rtl) {
-        rtlCSS = `.protyle-title__input,
+        style += `\n.protyle-title__input,
 .protyle-wysiwyg .p,
-.protyle-wysiwyg .code-block .hljs,
-.protyle-wysiwyg .table,
+.protyle-wysiwyg .table table,
 .protyle-wysiwyg .render-node protyle-html,
-.protyle-wysiwyg .render-node > div[spin="1"],
 .protyle-wysiwyg [data-type="NodeHeading"] {direction: rtl}
 .protyle-wysiwyg [data-node-id].li > .protyle-action {
     right: 0;
@@ -305,11 +312,6 @@ export const setInlineStyle = async (set = true, servePath = "../../../") => {
   margin-left: auto;
 }`;
     }
-    style += `\n:root{--b3-font-size-editor:${window.siyuan.config.editor.fontSize}px}
-.b3-typography code:not(.hljs), .protyle-wysiwyg span[data-type~=code] { font-variant-ligatures: ${window.siyuan.config.editor.codeLigatures ? "normal" : "none"} }
-${rtlCSS}
-.protyle-wysiwyg [data-node-id] {${window.siyuan.config.editor.justify ? " text-align: justify;" : ""}}
-.protyle-gutters button svg {height:${height}px}`;
     if (window.siyuan.config.editor.fontFamily) {
         style += `\n.b3-typography:not(.b3-typography--default), .protyle-wysiwyg, .protyle-title {font-family: "Emojis Additional", "Emojis Reset", "${window.siyuan.config.editor.fontFamily}", var(--b3-font-family)}`;
     }
@@ -328,29 +330,6 @@ ${rtlCSS}
     return style;
 };
 
-export const setCodeTheme = (cdn = Constants.PROTYLE_CDN) => {
-    const protyleHljsStyle = document.getElementById("protyleHljsStyle") as HTMLLinkElement;
-    let css;
-    if (window.siyuan.config.appearance.mode === 0) {
-        css = window.siyuan.config.appearance.codeBlockThemeLight;
-        if (!Constants.SIYUAN_CONFIG_APPEARANCE_LIGHT_CODE.includes(css)) {
-            css = "default";
-        }
-    } else {
-        css = window.siyuan.config.appearance.codeBlockThemeDark;
-        if (!Constants.SIYUAN_CONFIG_APPEARANCE_DARK_CODE.includes(css)) {
-            css = "github-dark";
-        }
-    }
-    const href = `${cdn}/js/highlight.js/styles/${css}.min.css?v=11.11.1`;
-    if (!protyleHljsStyle) {
-        addStyle(href, "protyleHljsStyle");
-    } else if (!protyleHljsStyle.href.includes(href)) {
-        protyleHljsStyle.remove();
-        addStyle(href, "protyleHljsStyle");
-    }
-};
-
 export const setMode = (modeElementValue: number) => {
     /// #if !MOBILE
     let mode = modeElementValue;
@@ -364,35 +343,7 @@ export const setMode = (modeElementValue: number) => {
     fetchPost("/api/setting/setAppearance", Object.assign({}, window.siyuan.config.appearance, {
         mode,
         modeOS: modeElementValue === 2,
-    }), async response => {
-        if (window.siyuan.config.appearance.themeJS) {
-            if (response.data.mode !== window.siyuan.config.appearance.mode ||
-                (response.data.mode === window.siyuan.config.appearance.mode && (
-                        (response.data.mode === 0 && window.siyuan.config.appearance.themeLight !== response.data.themeLight) ||
-                        (response.data.mode === 1 && window.siyuan.config.appearance.themeDark !== response.data.themeDark))
-                )
-            ) {
-                if (window.destroyTheme) {
-                    try {
-                        await window.destroyTheme();
-                        window.destroyTheme = undefined;
-                        document.getElementById("themeScript").remove();
-                    } catch (e) {
-                        console.error("destroyTheme error: " + e);
-                    }
-                } else {
-                    exportLayout({
-                        errorExit: false,
-                        cb() {
-                            window.location.reload();
-                        },
-                    });
-                    return;
-                }
-            }
-        }
-        appearance.onSetAppearance(response.data);
-    });
+    }));
     /// #endif
 };
 
@@ -419,7 +370,7 @@ const rgba2hex = (rgba: string) => {
 };
 
 const updateMobileTheme = (OSTheme: string) => {
-    if (isInIOS() || isInAndroid() || isInHarmony()) {
+    if (isInMobileApp()) {
         setTimeout(() => {
             const backgroundColor = rgba2hex(getComputedStyle(document.body).getPropertyValue("--b3-theme-background").trim());
             let mode = window.siyuan.config.appearance.mode;

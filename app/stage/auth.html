@@ -2,7 +2,7 @@
 <html style="height: 100%">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, height=device-height, interactive-widget=resizes-content, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title>{{.l6}}</title>
     <style>
         body {
@@ -21,6 +21,7 @@
             --b3-theme-background: #fff;
             --b3-theme-on-background: #202124;
             --b3-theme-on-primary: #fff;
+            background-color: var(--b3-theme-background);
         }
 
         .dark {
@@ -33,7 +34,6 @@
             --b3-theme-background: #1e1e1e;
             --b3-theme-on-background: #c9d1d9;
             --b3-theme-on-primary: #fff;
-            background-color: var(--b3-theme-background);
         }
 
         .b3-button {
@@ -423,15 +423,35 @@
             const {ipcRenderer} = require('electron')
             ipcRenderer.send('siyuan-quit', window.location.port)
         } catch (e) {
-            if ((window.webkit && window.webkit.messageHandlers) || window.JSAndroid || window.JSHarmony) {
-                window.location.href = 'siyuan://api/system/exit'
-            } else {
-                window.location.reload()
+            if (window.JSAndroid) {
+                window.JSAndroid.exit();
+                return;
             }
+
+            if (window.webkit && window.webkit.messageHandlers) {
+                window.webkit.messageHandlers.exit.postMessage("");
+                return;
+            }
+
+            if (window.JSHarmony) {
+                window.JSHarmony.exit();
+                return;
+            }
+
+            window.location.reload()
         }
     }
 
+    const url = new URL(window.location)
+    toPath = url.searchParams.get("to") || "/"
+
     const exitSiYuan = () => {
+        if (toPath.indexOf("/stage/build/app/window.html") > -1) {
+            const {ipcRenderer} = require('electron');
+            ipcRenderer.send("siyuan-cmd", "destroy");
+            return;
+        }
+
         document.querySelector('#message').classList.add('b3-snackbar--show')
         document.querySelector('#message').firstElementChild.innerHTML = "{{.l8}}"
         try {
@@ -467,7 +487,7 @@
         }
     }
 
-    const showMessage = (msg)=> {
+    const showMessage = (msg) => {
         document.querySelector('#message').classList.add('b3-snackbar--show')
         document.querySelector('#message').firstElementChild.innerHTML = msg
         setTimeout(() => {
@@ -480,7 +500,7 @@
         const inputElement = document.getElementById('authCode')
         const captchaElement = document.getElementById('captcha')
         const rememberMeElement = document.getElementById('rememberMe')
-        let code =  inputElement.value.trim();
+        let code = inputElement.value.trim();
         if ("" === code) {
             showMessage({{.l9}})
             inputElement.value = ''
@@ -500,8 +520,7 @@
             return response.json()
         }).then((response) => {
             if (0 === response.code) {
-                const url = new URL(window.location)
-                window.location.href = url.searchParams.get("to") || "/"
+                window.location.href = toPath
                 return
             }
 
@@ -526,6 +545,8 @@
         }
         if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
             document.querySelector('.b3-button--white').remove()
+        } else if (toPath.indexOf("/stage/build/app/window.html") > -1) {
+            document.querySelector('.b3-button--white').textContent = "{{.l11}}"
         }
 
         try {
@@ -560,9 +581,26 @@
         })
 
         // 用于授权页保持连接，避免非常驻内存内核自动退出 https://github.com/siyuan-note/insider/issues/1099
-        new WebSocket((window.location.protocol === 'https:' ? 'wss' : 'ws') + '://' + window.location.host + '/ws?app=siyuan&id=auth')
+        const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss' : 'ws') + '://' + window.location.host + '/ws?app=siyuan' + Math.random().toString(36).substring(8) + '&id=auth&type=auth')
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.cmd === "loginAuth") {
+                window.location.href = toPath
+            }
+        };
     }
     init();
+    window.addEventListener("click", (event) => {
+        if (event.target.tagName === "INPUT" &&
+            ["email", "number", "password", "search", "tel", "text", "url", "", null].includes(event.target.getAttribute("type")) &&
+            event.target.getAttribute("readonly") !== "readonly") {
+            if (window.JSAndroid && window.JSAndroid.showKeyboard) {
+                window.JSAndroid.showKeyboard();
+            } else if (window.JSHarmony && window.JSHarmony.showKeyboard) {
+                window.JSHarmony.showKeyboard();
+            }
+        }
+    })
 </script>
 </body>
 </html>

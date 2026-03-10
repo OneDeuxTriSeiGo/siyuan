@@ -12,6 +12,10 @@ import {processRender} from "../../../util/processCode";
 import {getColIconByType, getColNameByType} from "../col";
 import {getCompressURL} from "../../../../util/image";
 import {getPageSize} from "../groups";
+/// #if MOBILE
+import {activeBlur} from "../../../../mobile/util/keyboardToolbar";
+/// #endif
+import {renderKanban} from "../kanban/render";
 
 interface IIds {
     groupId: string,
@@ -32,6 +36,7 @@ interface ITableOptions {
         pageSizes: { [key: string]: string },
         query: string,
         oldOffset: number,
+        left?: number,
     }
 }
 
@@ -102,8 +107,8 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex, 
         });
         galleryHTML += `</div>
     <div class="av__gallery-actions">
-        <span class="protyle-icon protyle-icon--first b3-tooltips b3-tooltips__n" aria-label="${window.siyuan.languages.displayEmptyFields}" data-type="av-gallery-edit"><svg><use xlink:href="#iconEdit"></use></svg></span>
-        <span class="protyle-icon protyle-icon--last b3-tooltips b3-tooltips__n" aria-label="${window.siyuan.languages.more}" data-type="av-gallery-more"><svg><use xlink:href="#iconMore"></use></svg></span>
+        <span class="protyle-icon protyle-icon--first ariaLabel" data-position="4north" aria-label="${window.siyuan.languages.displayEmptyFields}" data-type="av-gallery-edit"><svg><use xlink:href="#iconEdit"></use></svg></span>
+        <span class="protyle-icon protyle-icon--last ariaLabel" data-position="4north" aria-label="${window.siyuan.languages.more}" data-type="av-gallery-more"><svg><use xlink:href="#iconMore"></use></svg></span>
     </div>
 </div>`;
     });
@@ -121,15 +126,15 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, rowIndex, 
 };
 
 const renderGroupGallery = (options: ITableOptions) => {
-    const searchInputElement = options.blockElement.querySelector('[data-type="av-search"]') as HTMLInputElement;
+    const searchInputElement = options.blockElement.querySelector('[data-type="av-search"]');
     const isSearching = searchInputElement && document.activeElement === searchInputElement;
-    const query = searchInputElement?.value || "";
+    const query = searchInputElement?.textContent || "";
 
     let avBodyHTML = "";
     options.data.view.groups.forEach((group: IAVGallery) => {
         if (group.groupHidden === 0) {
-            avBodyHTML += `${getGroupTitleHTML(group, group.cards.length)}
-<div data-group-id="${group.id}" data-page-size="${group.pageSize}" data-dtype="${group.groupKey.type}" data-content="${Lute.EscapeHTMLStr(group.groupValue.text?.content)}" class="av__body${group.groupFolded ? " fn__none" : ""}">${getGalleryHTML(group)}</div>`;
+            avBodyHTML += `${getGroupTitleHTML(group, group.cardCount)}
+<div data-group-id="${group.id}" data-page-size="${group.pageSize}" data-dtype="${group.groupKey.type}" data-content="${Lute.EscapeHTMLStr(group.groupValue.text?.content || "")}" class="av__body${group.groupFolded ? " fn__none" : ""}">${getGalleryHTML(group)}</div>`;
         }
     });
     if (options.renderAll) {
@@ -146,7 +151,7 @@ const renderGroupGallery = (options: ITableOptions) => {
     afterRenderGallery(options);
 };
 
-const afterRenderGallery = (options: ITableOptions) => {
+export const afterRenderGallery = (options: ITableOptions) => {
     const view = options.data.view as IAVGallery;
     if (view.coverFrom === 1 || view.coverFrom === 3) {
         processRender(options.blockElement);
@@ -161,6 +166,9 @@ const afterRenderGallery = (options: ITableOptions) => {
     options.blockElement.setAttribute("data-render", "true");
     if (options.resetData.alignSelf) {
         options.blockElement.style.alignSelf = options.resetData.alignSelf;
+    }
+    if (options.resetData.left) {
+        options.blockElement.querySelector(".av__kanban").scrollLeft = options.resetData.left;
     }
     options.resetData.selectItemIds.find(selectId => {
         let itemElement = options.blockElement.querySelector(`.av__body[data-group-id="${selectId.groupId}"] .av__gallery-item[data-id="${selectId.fieldId}"]`) as HTMLElement;
@@ -178,6 +186,7 @@ const afterRenderGallery = (options: ITableOptions) => {
         }
         if (itemElement) {
             itemElement.querySelector(".av__gallery-fields").classList.add("av__gallery-fields--edit");
+            itemElement.querySelector('.protyle-icon[data-type="av-gallery-edit"]').setAttribute("aria-label", window.siyuan.languages.hideEmptyFields);
         }
     });
     Object.keys(options.resetData.pageSizes).forEach((groupId) => {
@@ -204,8 +213,8 @@ const afterRenderGallery = (options: ITableOptions) => {
         return;
     }
     const viewsElement = options.blockElement.querySelector(".av__views") as HTMLElement;
-    const searchInputElement = options.blockElement.querySelector('[data-type="av-search"]') as HTMLInputElement;
-    searchInputElement.value = options.resetData.query || "";
+    const searchInputElement = options.blockElement.querySelector('[data-type="av-search"]') as HTMLElement;
+    searchInputElement.textContent = options.resetData.query || "";
     if (options.resetData.isSearching) {
         searchInputElement.focus();
     }
@@ -223,7 +232,7 @@ const afterRenderGallery = (options: ITableOptions) => {
         if (event.isComposing) {
             return;
         }
-        if (searchInputElement.value || document.activeElement === searchInputElement) {
+        if (searchInputElement.textContent || document.activeElement === searchInputElement) {
             viewsElement.classList.add("av__views--show");
         } else {
             viewsElement.classList.remove("av__views--show");
@@ -237,11 +246,11 @@ const afterRenderGallery = (options: ITableOptions) => {
         if (event.isComposing) {
             return;
         }
-        if (!searchInputElement.value) {
+        if (!searchInputElement.textContent) {
             viewsElement.classList.remove("av__views--show");
             searchInputElement.style.width = "0";
             searchInputElement.style.paddingLeft = "0";
-            searchInputElement.style.paddingRight = "0";
+            searchInputElement.style.marginRight = "0";
         }
     });
     addClearButton({
@@ -253,9 +262,12 @@ const afterRenderGallery = (options: ITableOptions) => {
             viewsElement.classList.remove("av__views--show");
             searchInputElement.style.width = "0";
             searchInputElement.style.paddingLeft = "0";
-            searchInputElement.style.paddingRight = "0";
+            searchInputElement.style.marginRight = "0";
             focusBlock(options.blockElement);
             updateSearch(options.blockElement, options.protyle);
+            /// #if MOBILE
+            activeBlur();
+            /// #endif
         }
     });
 };
@@ -267,7 +279,7 @@ export const renderGallery = async (options: {
     renderAll: boolean,
     data?: IAV,
 }) => {
-    const searchInputElement = options.blockElement.querySelector('[data-type="av-search"]') as HTMLInputElement;
+    const searchInputElement = options.blockElement.querySelector('[data-type="av-search"]');
     const editIds: IIds[] = [];
     options.blockElement.querySelectorAll(".av__gallery-fields--edit").forEach(item => {
         editIds.push({
@@ -291,7 +303,7 @@ export const renderGallery = async (options: {
     });
     const resetData = {
         isSearching: searchInputElement && document.activeElement === searchInputElement,
-        query: searchInputElement?.value || "",
+        query: searchInputElement?.textContent || "",
         alignSelf: options.blockElement.style.alignSelf,
         oldOffset: options.protyle.contentElement.scrollTop,
         editIds,
@@ -324,8 +336,19 @@ export const renderGallery = async (options: {
         data = response.data;
     }
     if (data.viewType === "table") {
-        options.blockElement.setAttribute("data-av-type", "table");
-        avRender(options.blockElement, options.protyle, options.cb, options.renderAll);
+        options.blockElement.setAttribute("data-av-type", data.viewType);
+        avRender(options.blockElement, options.protyle, options.cb, options.renderAll, data);
+        return;
+    }
+    if (data.viewType === "kanban") {
+        options.blockElement.setAttribute("data-av-type", data.viewType);
+        renderKanban({
+            blockElement: options.blockElement,
+            protyle: options.protyle,
+            cb: options.cb,
+            renderAll: options.renderAll,
+            data
+        });
         return;
     }
     const view: IAVGallery = data.view as IAVGallery;

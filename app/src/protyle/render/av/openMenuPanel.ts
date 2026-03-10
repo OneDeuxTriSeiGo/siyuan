@@ -49,9 +49,13 @@ import {Dialog} from "../../../dialog";
 import {bindLayoutEvent, getLayoutHTML, updateLayout} from "./layout";
 import {setGalleryCover, setGalleryRatio, setGallerySize} from "./gallery/util";
 import {
-    bindGroupsEvent, bindGroupsNumber,
+    bindGroupsEvent,
+    bindGroupsNumber,
     getGroupsHTML,
-    getGroupsMethodHTML, getGroupsNumberHTML, getLanguageByIndex, getPageSize,
+    getGroupsMethodHTML,
+    getGroupsNumberHTML,
+    getLanguageByIndex,
+    getPageSize,
     goGroupsDate,
     goGroupsSort,
     setGroupMethod
@@ -79,7 +83,7 @@ export const openMenuPanel = (options: {
     const avPageSize = getPageSize(options.blockElement);
     fetchPost("/api/av/renderAttributeView", {
         id: avID,
-        query: (options.blockElement.querySelector('[data-type="av-search"]') as HTMLInputElement)?.value.trim() || "",
+        query: options.blockElement.querySelector('[data-type="av-search"]')?.textContent.trim() || "",
         pageSize: avPageSize.unGroupPageSize,
         groupPaging: avPageSize.groupPageSize,
         viewID: options.blockElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW)
@@ -600,11 +604,12 @@ export const openMenuPanel = (options: {
                         hideElements(["util"], options.protyle);
                     } else if (!window.siyuan.menus.menu.element.classList.contains("fn__none")) {
                         // 过滤面板先关闭过滤条件
-                        window.siyuan.menus.menu.remove();
                     } else {
                         closeCB?.();
                         avPanelElement.remove();
-                        focusBlock(options.blockElement);
+                        setTimeout(() => {
+                            focusBlock(options.blockElement);
+                        }, Constants.TIMEOUT_TRANSITION);  // 单选使用 enter 修改选项后会滚动
                     }
                     window.siyuan.menus.menu.remove();
                     event.preventDefault();
@@ -1353,25 +1358,25 @@ export const openMenuPanel = (options: {
                     event.stopPropagation();
                     break;
                 } else if (type === "openAssetItem") {
+                    const assetType = target.parentElement.dataset.type;
                     const assetLink = target.parentElement.dataset.content;
-                    const suffix = pathPosix().extname(assetLink);
                     /// #if !MOBILE
-                    if (isLocalPath(assetLink) && (
-                        [".pdf"].concat(Constants.SIYUAN_ASSETS_AUDIO).concat(Constants.SIYUAN_ASSETS_VIDEO).includes(suffix) && (
-                            suffix !== ".pdf" || (suffix === ".pdf" && !assetLink.startsWith("file://"))
-                        )
+                    const suffix = pathPosix().extname(assetLink);
+                    if (assetType === "image") {
+                        previewAttrViewImages(assetLink, avID, options.blockElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW),
+                            options.blockElement.querySelector('[data-type="av-search"]')?.textContent.trim() || "");
+                    } else if (isLocalPath(assetLink) && assetType === "file" && (
+                        (suffix === ".pdf" && !assetLink.startsWith("file://")) ||
+                        Constants.SIYUAN_ASSETS_AUDIO.concat(Constants.SIYUAN_ASSETS_VIDEO, Constants.SIYUAN_ASSETS_IMAGE).includes(suffix)
                     )) {
                         openAsset(options.protyle.app, assetLink.trim(), parseInt(getSearch("page", assetLink)), "right");
-                    } else if (Constants.SIYUAN_ASSETS_IMAGE.includes(suffix)) {
-                        previewAttrViewImages(assetLink, avID, options.blockElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW),
-                            (options.blockElement.querySelector('[data-type="av-search"]') as HTMLInputElement)?.value.trim() || "");
                     } else {
                         window.open(assetLink);
                     }
                     /// #else
-                    if (Constants.SIYUAN_ASSETS_IMAGE.includes(suffix)) {
+                    if (assetType === "image") {
                         previewAttrViewImages(assetLink, avID, options.blockElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW),
-                            (options.blockElement.querySelector('[data-type="av-search"]') as HTMLInputElement)?.value.trim() || "");
+                            options.blockElement.querySelector('[data-type="av-search"]')?.textContent.trim() || "");
                     } else {
                         window.open(assetLink);
                     }
@@ -1558,7 +1563,7 @@ export const openMenuPanel = (options: {
                             data
                         });
                     } else {
-                        menuElement.innerHTML = getGroupsMethodHTML(fields, data.view.group);
+                        menuElement.innerHTML = getGroupsMethodHTML(fields, data.view.group, data.viewType);
                     }
                     setPosition(menuElement, tabRect.right - menuElement.clientWidth, tabRect.bottom, tabRect.height);
                     event.preventDefault();
@@ -1566,7 +1571,7 @@ export const openMenuPanel = (options: {
                     break;
                 } else if (type === "goGroupsMethod") {
                     window.siyuan.menus.menu.remove();
-                    menuElement.innerHTML = getGroupsMethodHTML(fields, data.view.group);
+                    menuElement.innerHTML = getGroupsMethodHTML(fields, data.view.group, data.viewType);
                     setPosition(menuElement, tabRect.right - menuElement.clientWidth, tabRect.bottom, tabRect.height);
                     event.preventDefault();
                     event.stopPropagation();
